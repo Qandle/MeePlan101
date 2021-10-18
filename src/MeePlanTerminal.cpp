@@ -21,6 +21,7 @@ void drawTab()
   tft.fillRect(0, 0, SCREEN_WIDTH, 30, TFT_LIGHTGREY);
 }
 
+
 void drawArrows(){
   tft.drawTriangle(270, 80, 290, 40, 310, 80, TFT_DARKGREY);
   tft.fillTriangle(270, 80, 290, 40, 310, 80, TFT_DARKGREY);
@@ -28,13 +29,14 @@ void drawArrows(){
   tft.fillTriangle(270, 190, 290, 230, 310, 190, TFT_DARKGREY);
 }
 
+
 void drawCursor(){
 
 }
 
-void drawMenu(int32_t x, int32_t y){
-  tft.drawRoundRect(x, y, 260, 45, 5, TFT_DARKGREY);
-  tft.fillRoundRect(x, y, 260, 45, 5, TFT_DARKGREY);
+void drawMenu(int32_t x, int32_t y, uint32_t color){
+  tft.drawRoundRect(x, y, 260, 45, 5, color);
+  tft.fillRoundRect(x, y, 260, 45, 5, color);
 }
 
 
@@ -50,12 +52,12 @@ void setup()
   tft.setTextWrap(true);
   drawTab();
   drawArrows();
-  drawMenu(5,35);
-  drawMenu(5,85);
-  drawMenu(5,135);
-  drawMenu(5,185);
+  drawMenu(5,35,TFT_DARKGREY);
+  drawMenu(5,85,TFT_DARKGREY);
+  drawMenu(5,135,TFT_DARKGREY);
+  drawMenu(5,185,TFT_DARKGREY);
   tft.setTextDatum(TR_DATUM);
-  tft.drawString("00:00", 315, 5,1);
+  tft.drawString("00:00", 315, 5);
 }
 
 void loop()
