@@ -15,9 +15,27 @@ TFT_eSPI tft;
 const char *ssid = "wifi here";
 const char *password = "password here";
 int check_menu_logo = 0;
+int check_setting = 0;
 
 int text_height = 0;
 int text_width = 0;
+
+//star
+#define NSTARS 1024
+uint8_t sx[NSTARS] = {};
+uint8_t sy[NSTARS] = {};
+uint8_t sz[NSTARS] = {};
+
+uint8_t za, zb, zc, zx;
+
+uint8_t __attribute__((always_inline)) rng()
+{
+  zx++;
+  za = (za ^ zc ^ zx);
+  zb = (zb + za);
+  zc = ((zc + (zb >> 1)) ^ za);
+  return zc;
+}
 
 void drawTab()
 {
@@ -48,13 +66,14 @@ void MeePlan_Logo()
 
   tft.fillScreen(TFT_PURPLE);
   tft.setFreeFont(&FreeSansBoldOblique24pt7b);
-  tft.setTextColor(TFT_LIGHTGREY);
+  tft.setTextColor(TFT_WHITE);
   tft.setTextSize(1);
   tft.drawString("Mee Plan", 60, 100);
 
   while (check_menu_logo != 1)
   {
     tft.setFreeFont(&FreeSansBoldOblique12pt7b);
+    tft.setTextColor(TFT_LIGHTGREY);
     tft.drawString("click to continue..", 60, 180);
     text_height = tft.fontHeight();
     text_width = tft.textWidth("click to continue..");
@@ -82,15 +101,15 @@ void MeePlan_Logo()
     {
       check_menu_logo = 1;
     }
-    if (digitalRead(WIO_KEY_LEFT) == LOW)
+    if (digitalRead(WIO_5S_LEFT) == LOW)
     {
       check_menu_logo = 1;
     }
-    if (digitalRead(WIO_KEY_RIGHT) == LOW)
+    if (digitalRead(WIO_5S_RIGHT) == LOW)
     {
       check_menu_logo = 1;
     }
-    if (digitalRead(WIO_KEY_PRESS) == LOW)
+    if (digitalRead(WIO_5S_PRESS) == LOW)
     {
       check_menu_logo = 1;
     }
@@ -103,6 +122,70 @@ void drawMenu()
 
 void drawSetting()
 {
+  tft.fillScreen(TFT_PURPLE);
+  tft.setFreeFont(&FreeSansBoldOblique18pt7b);
+  tft.setTextColor(TFT_WHITE);
+  tft.setTextSize(1);
+  tft.drawString("> Connect WIFI", 25, 20);
+  tft.drawString("\" Mee Plan \"", 60, 100);
+  while (check_setting != 1)
+  {
+    tft.setFreeFont(&FreeSansBoldOblique12pt7b);
+    tft.setTextColor(TFT_GREEN);
+    tft.setTextSize(1);
+    tft.drawString("waiting for connection..", 25, 180);
+    text_height = tft.fontHeight();
+    text_width = tft.textWidth("waiting for connection..");
+    tft.fillRect(25, 180, text_width, text_height, TFT_PURPLE);
+    delay(800);
+    tft.drawString("waiting for connection..", 25, 180);
+    delay(800);
+  }
+}
+
+void star_bg()
+{
+  unsigned long t0 = micros();
+  uint8_t spawnDepthVariation = 255;
+
+  for (int i = 0; i < NSTARS; ++i)
+  {
+    if (sz[i] <= 1)
+    {
+      sx[i] = 160 - 120 + rng();
+      sy[i] = rng();
+      sz[i] = spawnDepthVariation--;
+    }
+    else
+    {
+      int old_screen_x = ((int)sx[i] - 160) * 256 / sz[i] + 160;
+      int old_screen_y = ((int)sy[i] - 120) * 256 / sz[i] + 120;
+
+      // This is a faster pixel drawing function for occassions where many single pixels must be drawn
+      tft.drawPixel(old_screen_x, old_screen_y, TFT_BLACK);
+
+      sz[i] -= 2;
+      if (sz[i] > 1)
+      {
+        int screen_x = ((int)sx[i] - 160) * 256 / sz[i] + 160;
+        int screen_y = ((int)sy[i] - 120) * 256 / sz[i] + 120;
+
+        if (screen_x >= 0 && screen_y >= 0 && screen_x < 320 && screen_y < 240)
+        {
+          uint8_t r, g, b;
+          r = g = b = 255 - sz[i];
+          tft.drawPixel(screen_x, screen_y, tft.color565(r, g, b));
+        }
+        else
+          sz[i] = 0; // Out of screen, die.
+      }
+    }
+  }
+  unsigned long t1 = micros();
+  //static char timeMicros[8] = {};
+
+  // Calcualte frames per second
+  Serial.println(1.0 / ((t1 - t0) / 1000000.0));
 }
 
 void setup()
@@ -132,11 +215,16 @@ void setup()
   tft.setTextDatum(TR_DATUM);
   tft.drawString("00:00", 315, 5);
   */
-  MeePlan_Logo();
+  za = random(256);
+  zb = random(256);
+  zc = random(256);
+  zx = random(256);
+
+  tft.fillScreen(TFT_BLACK);
+  drawSetting();
 }
 
 void loop()
 {
-
-  delay(5000);
+  delay(1000);
 }
