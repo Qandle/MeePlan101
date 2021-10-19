@@ -163,7 +163,7 @@ void drawMenu()
 {
 }
 
-void drawSetting()
+void drawConnect()
 {
   tft.fillScreen(MEE_GREYPURPLE);
   tft.setFreeFont(&FreeSansBoldOblique18pt7b);
@@ -221,7 +221,7 @@ void setup()
   zx = random(256);
 
   tft.fillScreen(TFT_BLACK);
-  drawSetting();
+  //drawConnect();
 }
 
 void loop()
