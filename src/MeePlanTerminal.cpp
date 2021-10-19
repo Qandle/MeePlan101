@@ -5,15 +5,24 @@
 #include <rpcWiFi.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
+#include <Bounce2.h>
 #include "TFT_eSPI.h"
 #include "Free_Fonts.h"
-
-#define SCREEN_WIDTH 320
-#define SCREEN_HEIGHT 240
 
 //tft color format rgb565
 #define MEE_GREYPURPLE 0x526B
 #define MEE_LIGHTPURPLE 0xE71F
+
+#define SCREEN_WIDTH 320
+#define SCREEN_HEIGHT 240
+#define NUM_BUTTONS 8
+const uint8_t BUTTON_PINS[NUM_BUTTONS] = {WIO_KEY_C, WIO_KEY_B, WIO_KEY_A, WIO_5S_PRESS, WIO_5S_UP, WIO_5S_RIGHT, WIO_5S_DOWN, WIO_5S_LEFT};
+enum button_enum
+{
+
+}
+
+Bounce *buttons = new Bounce[NUM_BUTTONS];
 
 TFT_eSPI tft;
 const char *ssid = "wifi here";
@@ -24,6 +33,7 @@ int check_setting = 0;
 int text_height = 0;
 int text_width = 0;
 
+int action = 0;
 int cursor_position = 0;
 int mode = 0;
 
@@ -128,37 +138,15 @@ void MeePlan_Logo()
     delay(800);
     tft.drawString("click to continue..", 60, 180);
     delay(800);
-    if (digitalRead(WIO_KEY_A) == LOW)
+    for (int i = 0; i < NUM_BUTTONS; i++)
     {
-      check_menu_logo = 1;
-    }
-    if (digitalRead(WIO_KEY_B) == LOW)
-    {
-      check_menu_logo = 1;
-    }
-    if (digitalRead(WIO_KEY_C) == LOW)
-    {
-      check_menu_logo = 1;
-    }
-    if (digitalRead(WIO_5S_UP) == LOW)
-    {
-      check_menu_logo = 1;
-    }
-    if (digitalRead(WIO_5S_DOWN) == LOW)
-    {
-      check_menu_logo = 1;
-    }
-    if (digitalRead(WIO_5S_LEFT) == LOW)
-    {
-      check_menu_logo = 1;
-    }
-    if (digitalRead(WIO_5S_RIGHT) == LOW)
-    {
-      check_menu_logo = 1;
-    }
-    if (digitalRead(WIO_5S_PRESS) == LOW)
-    {
-      check_menu_logo = 1;
+      // Update the Bounce instance :
+      buttons[i].update();
+      // If it fell, flag the need to toggle the LED
+      if (buttons[i].fell())
+      {
+        check_menu_logo = 1;
+      }
     }
   }
 }
@@ -190,20 +178,15 @@ void drawConnect()
   }
 }
 
-
-
 void setup()
 {
   tft.begin();
   tft.setRotation(3);
-  pinMode(WIO_5S_UP, INPUT_PULLUP);
-  pinMode(WIO_5S_DOWN, INPUT_PULLUP);
-  pinMode(WIO_5S_LEFT, INPUT_PULLUP);
-  pinMode(WIO_5S_RIGHT, INPUT_PULLUP);
-  pinMode(WIO_5S_PRESS, INPUT_PULLUP);
-  pinMode(WIO_KEY_A, INPUT_PULLUP);
-  pinMode(WIO_KEY_B, INPUT_PULLUP);
-  pinMode(WIO_KEY_C, INPUT_PULLUP);
+  for (int i = 0; i < NUM_BUTTONS; i++)
+  {
+    buttons[i].attach(BUTTON_PINS[i], INPUT_PULLUP); //setup the bounce instance for the current button
+    buttons[i].interval(25);
+  }
   //screen setup
   /*
   tft.fillScreen(TFT_WHITE); // fills entire the screen with colour red
@@ -225,10 +208,22 @@ void setup()
   zx = random(256);
 
   tft.fillScreen(MEE_LIGHTPURPLE);
+
   //drawConnect();
 }
 
 void loop()
 {
-  delay(1000);
+  action = 0;
+  for (int i = 0; i < NUM_BUTTONS; i++)
+  {
+    // Update the Bounce instance :
+    buttons[i].update();
+    // If it fell, flag the need to toggle the LED
+    if (buttons[i].fell())
+    {
+      Serial.printf("%d fell.\n", i);
+      action = i;
+    }
+  }
 }
