@@ -47,6 +47,20 @@ int check_setting = 0;
 int text_height = 0;
 int text_width = 0;
 
+//for testing
+int taskcount = 4;
+int pgcount = 1;
+int currentpg = 1;
+
+String taskmsg1[4] = {"TEST MSG LINE ONE ^_^", "TEST MSG TWO ONE  T_T", "TEST MSG THREE ONE^_^", "I'M POOR"};
+String taskmsg2[4] = {"TEST MSG LINE TWO T_T", "TEST MSG TWO TWO  ^_^", "TEST MSG THREE TWOT_T", "GIVE ME MONEY"};
+String taskdue[4] = {"15/12/2021 00:00", "15/12/2021 01:00", "15/12/2021 02:00", "69/96/2021 02:00"};
+
+int taskstype[4] = {2,1,0,3};
+int tasksstatus[4] = {0,1,0,1};
+
+int is_draw = 0;
+int is_draw_top = 0;
 int cursor_position = 0;
 enum action current_action = NONE;
 enum mode current_mode = TASK;
@@ -108,10 +122,21 @@ void star_bg()
   //static char timeMicros[8] = {};
 }
 
+void drawSelectbox(int32_t x, int32_t y, uint32_t color)
+{
+  tft.drawRoundRect(x, y, 260, 45, 5, color);
+  tft.fillRoundRect(x, y, 260, 45, 5, color);
+}
+
 void drawTab()
 {
-  tft.drawRect(0, 0, SCREEN_WIDTH, 30, TFT_LIGHTGREY);
-  tft.fillRect(0, 0, SCREEN_WIDTH, 30, TFT_LIGHTGREY);
+  tft.drawRect(0, 0, SCREEN_WIDTH, 32, TFT_LIGHTGREY);
+  tft.fillRect(0, 0, SCREEN_WIDTH, 32, TFT_LIGHTGREY);
+}
+
+void fillMenu(uint32_t color)
+{
+  tft.fillRect(0, 32, SCREEN_WIDTH, SCREEN_HEIGHT - 32, color);
 }
 
 void drawArrows()
@@ -122,14 +147,14 @@ void drawArrows()
   tft.fillTriangle(270, 190, 290, 230, 310, 190, TFT_DARKGREY);
 }
 
-void drawCursor()
+void updateCursor(uint32_t color)
 {
-}
-
-void drawSelectbox(int32_t x, int32_t y, uint32_t color)
-{
-  tft.drawRoundRect(x, y, 260, 45, 5, color);
-  tft.fillRoundRect(x, y, 260, 45, 5, color);
+  tft.fillRect(0,32,25,SCREEN_HEIGHT-32, MEE_LIGHTPURPLE);
+  tft.setTextColor(TFT_BLACK);
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextSize(2);
+  tft.drawString(">",10,50 + (cursor_position*50));
+  
 }
 
 void MeePlan_Logo()
@@ -165,7 +190,53 @@ void MeePlan_Logo()
   }
 }
 
-void drawMenu()
+void drawTask(uint32_t x, uint32_t y, int type, int status,const char *msg1,const char *msg2,const char *due)
+{
+  tft.setTextColor(TFT_BLACK, MEE_LIGHTPURPLE);
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextSize(2);
+  
+  tft.fillRect(293, y + 12,15,20,TFT_WHITE);
+  tft.drawRect(293, y + 12,15,20,TFT_BLACK);
+  if(status){
+  tft.drawString("X", 295, y + 15);
+  }
+  
+  switch (type)
+  {
+  case 0:
+    tft.setTextColor(TFT_BLACK, TFT_GREENYELLOW);
+    drawSelectbox(x, y, TFT_GREENYELLOW);
+    break;
+  case 1:
+    tft.setTextColor(TFT_BLACK, TFT_YELLOW);
+    drawSelectbox(x, y, TFT_YELLOW);
+    break;
+  case 2:
+    tft.setTextColor(TFT_WHITE, TFT_RED);
+    drawSelectbox(x, y, TFT_RED);
+    break;
+  case 3:
+    tft.setTextColor(TFT_WHITE, TFT_DARKGREY);
+    drawSelectbox(x, y, TFT_DARKGREY);
+    break;
+  default:
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    drawSelectbox(x, y, TFT_BLACK);
+    break;
+  }
+
+  tft.drawString(msg1, x + 5, y + 10);
+  tft.drawString(msg2, x + 5, y + 27);
+
+  tft.setTextDatum(TR_DATUM);
+  tft.setTextSize(1);
+  tft.drawString(due, x + 255, y + 1);
+
+  tft.setTextDatum(TL_DATUM);
+}
+
+void drawSettingMenu()
 {
 }
 
@@ -224,10 +295,13 @@ void setup()
   tft.fillScreen(MEE_LIGHTPURPLE);
 
   //drawConnect();
+
+  drawTab();
 }
 
 void loop()
 {
+  tft.setTextSize(5);
   current_action = NONE;
   for (int i = 0; i < NUM_BUTTONS; i++)
   {
@@ -235,69 +309,93 @@ void loop()
     if (buttons[i].fell())
     {
       Serial.printf("%d fell.\n", i);
-      current_action = static_cast<action> (i);
+      current_action = static_cast<action>(i);
     }
-
   }
   //structure for menu
   switch (current_mode)
   {
   case TASK:
-    tft.setTextSize(5);
-    tft.drawString("TASK", 25, 180);
-    if (current_action == ONE)
+    tft.setTextColor(TFT_BLACK, MEE_LIGHTPURPLE);
+    if (is_draw == 0)
     {
-      tft.drawString("BUTTON1", 0, 0);
+      updateCursor(MEE_LIGHTPURPLE);
+      tft.setTextSize(5);
+      tft.drawString("TASK", 25, 180);
+      is_draw = 1;
+      for (int i = 0; i < taskcount; i++)
+      {
+        drawTask(30, 35 + (i*50), taskstype[i], tasksstatus[i], taskmsg1[i].c_str(), taskmsg2[i].c_str(), taskdue[i].c_str());
+      }
+      
     }
     if (current_action == TWO)
     {
-      tft.drawString("BUTTON2", 0, 0);
-    }
-    if (current_action == THREE)
-    {
-      tft.drawString("BUTTON3", 0, 0);
-    }
-    if (current_action == LEFT)
-    {
-      current_mode = SETTING;
-      tft.fillScreen(MEE_LIGHTPURPLE);
-    }
-    if (current_action == RIGHT)
-    {
       current_mode = CLOCK;
-      tft.fillScreen(MEE_LIGHTPURPLE);
+      fillMenu(MEE_LIGHTPURPLE);
+      is_draw = 0;
+    }
+    if (current_action == UP)
+    {
+      if(currentpg != 1 && cursor_position == 0){
+        currentpg--;
+        cursor_position = 3;
+      }else if(cursor_position>0){
+        cursor_position--;
+      }
+      updateCursor(TFT_BLACK);
+    }
+    if (current_action == DOWN)
+    {
+      
+      if(currentpg != pgcount && cursor_position == 3){
+        currentpg--;
+        cursor_position = 0;
+      }else if(cursor_position<3){
+        cursor_position++;
+      }
+      updateCursor(TFT_BLACK);
+    }
+    if (current_action == PUSH)
+    {
+      tasksstatus[cursor_position] = !tasksstatus[cursor_position];
+      drawTask(30, 35 + (cursor_position*50), taskstype[cursor_position], tasksstatus[cursor_position], taskmsg1[cursor_position].c_str(), taskmsg2[cursor_position].c_str(), taskdue[cursor_position].c_str());
     }
     break;
   case CLOCK:
-    tft.drawString("CLOCK", 25, 180);
-    if (current_action == LEFT)
+    tft.setTextColor(TFT_BLACK, MEE_LIGHTPURPLE);
+    if (is_draw == 0)
+    {
+      tft.drawString("CLOCK", 25, 180);
+      is_draw = 1;
+    }
+    if (current_action == TWO)
     {
       current_mode = TASK;
-      tft.fillScreen(MEE_LIGHTPURPLE);
+      fillMenu(MEE_LIGHTPURPLE);
+      is_draw = 0;
     }
-    if (current_action == RIGHT)
+    if (current_action == THREE)
     {
       current_mode = SETTING;
-      tft.fillScreen(MEE_LIGHTPURPLE);
+      fillMenu(MEE_GREYPURPLE);
+      is_draw = 0;
     }
     break;
   case SETTING:
-    tft.drawString("SETTING", 25, 180);
-    if (current_action == LEFT)
+    tft.setTextColor(TFT_BLACK, MEE_GREYPURPLE);
+    if (is_draw == 0)
+    {
+      tft.drawString("SETTING", 25, 180);
+      is_draw = 1;
+    }
+    if (current_action == TWO)
     {
       current_mode = CLOCK;
-      tft.fillScreen(MEE_LIGHTPURPLE);
-    }
-    if (current_action == RIGHT)
-    {
-      current_mode = TASK;
-      tft.fillScreen(MEE_LIGHTPURPLE);
+      fillMenu(MEE_LIGHTPURPLE);
+      is_draw = 0;
     }
     break;
   }
 
-    if (current_action == PUSH)
-    {
-      tft.drawString("PUSH", 0, 40);
-    }
 }
