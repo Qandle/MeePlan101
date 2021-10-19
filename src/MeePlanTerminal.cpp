@@ -17,10 +17,7 @@
 #define SCREEN_HEIGHT 240
 #define NUM_BUTTONS 8
 const uint8_t BUTTON_PINS[NUM_BUTTONS] = {WIO_KEY_C, WIO_KEY_B, WIO_KEY_A, WIO_5S_PRESS, WIO_5S_UP, WIO_5S_RIGHT, WIO_5S_DOWN, WIO_5S_LEFT};
-enum button_enum
-{
 
-}
 
 Bounce *buttons = new Bounce[NUM_BUTTONS];
 
