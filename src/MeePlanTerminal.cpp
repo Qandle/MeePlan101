@@ -272,21 +272,6 @@ void setup()
     buttons[i].attach(BUTTON_PINS[i], INPUT_PULLUP); //setup the bounce instance for the current button
     buttons[i].interval(20);
   }
-  //screen setup
-  /*
-  tft.fillScreen(TFT_WHITE); // fills entire the screen with colour red
-  tft.setTextSize(3);
-  tft.setTextColor(TFT_BLACK);
-  tft.setTextWrap(true);
-  drawTab();
-  drawArrows();
-  drawSelectbox(5,35,TFT_DARKGREY);
-  drawSelectbox(5,85,TFT_DARKGREY);
-  drawSelectbox(5,135,TFT_DARKGREY);
-  drawSelectbox(5,185,TFT_DARKGREY);
-  tft.setTextDatum(TR_DATUM);
-  tft.drawString("00:00", 315, 5);
-  */
   za = random(256);
   zb = random(256);
   zc = random(256);
