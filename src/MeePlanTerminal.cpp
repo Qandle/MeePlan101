@@ -11,6 +11,9 @@
 #define SCREEN_WIDTH 320
 #define SCREEN_HEIGHT 240
 
+#define MEE_GREYPURPLE 0x526B
+#define MEE_LIGHTPURPLE 0xE71F
+
 TFT_eSPI tft;
 const char *ssid = "wifi here";
 const char *password = "password here";
@@ -104,7 +107,7 @@ void drawSelectbox(int32_t x, int32_t y, uint32_t color)
 void MeePlan_Logo()
 {
 
-  tft.fillScreen(TFT_PURPLE);
+  tft.fillScreen(MEE_GREYPURPLE);
   tft.setFreeFont(&FreeSansBoldOblique24pt7b);
   tft.setTextColor(TFT_WHITE);
   tft.setTextSize(1);
@@ -117,7 +120,7 @@ void MeePlan_Logo()
     tft.drawString("click to continue..", 60, 180);
     text_height = tft.fontHeight();
     text_width = tft.textWidth("click to continue..");
-    tft.fillRect(60, 180, text_width, text_height, TFT_PURPLE);
+    tft.fillRect(60, 180, text_width, text_height, MEE_GREYPURPLE);
     delay(800);
     tft.drawString("click to continue..", 60, 180);
     delay(800);
@@ -162,7 +165,7 @@ void drawMenu()
 
 void drawSetting()
 {
-  tft.fillScreen(TFT_PURPLE);
+  tft.fillScreen(MEE_GREYPURPLE);
   tft.setFreeFont(&FreeSansBoldOblique18pt7b);
   tft.setTextColor(TFT_WHITE);
   tft.setTextSize(1);
@@ -176,7 +179,7 @@ void drawSetting()
     tft.drawString("waiting for connection..", 25, 180);
     text_height = tft.fontHeight();
     text_width = tft.textWidth("waiting for connection..");
-    tft.fillRect(25, 180, text_width, text_height, TFT_PURPLE);
+    tft.fillRect(25, 180, text_width, text_height, MEE_GREYPURPLE);
     delay(800);
     tft.drawString("waiting for connection..", 25, 180);
     delay(800);
