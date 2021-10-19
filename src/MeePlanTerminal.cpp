@@ -214,9 +214,7 @@ void loop()
   action = 0;
   for (int i = 0; i < NUM_BUTTONS; i++)
   {
-    // Update the Bounce instance :
     buttons[i].update();
-    // If it fell, flag the need to toggle the LED
     if (buttons[i].fell())
     {
       Serial.printf("%d fell.\n", i);
