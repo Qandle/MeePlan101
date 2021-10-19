@@ -17,7 +17,24 @@
 #define SCREEN_HEIGHT 240
 #define NUM_BUTTONS 8
 const uint8_t BUTTON_PINS[NUM_BUTTONS] = {WIO_KEY_C, WIO_KEY_B, WIO_KEY_A, WIO_5S_PRESS, WIO_5S_UP, WIO_5S_RIGHT, WIO_5S_DOWN, WIO_5S_LEFT};
-
+enum mode
+{
+  TASK,
+  CLOCK,
+  SETTING
+};
+enum action
+{
+  ONE,
+  TWO,
+  THREE,
+  PUSH,
+  UP,
+  RIGHT,
+  DOWN,
+  LEFT,
+  NONE,
+};
 
 Bounce *buttons = new Bounce[NUM_BUTTONS];
 
@@ -30,9 +47,9 @@ int check_setting = 0;
 int text_height = 0;
 int text_width = 0;
 
-int action = 0;
 int cursor_position = 0;
-int mode = 0;
+enum action current_action = NONE;
+enum mode current_mode = TASK;
 
 //star
 #define NSTARS 1024
@@ -182,7 +199,7 @@ void setup()
   for (int i = 0; i < NUM_BUTTONS; i++)
   {
     buttons[i].attach(BUTTON_PINS[i], INPUT_PULLUP); //setup the bounce instance for the current button
-    buttons[i].interval(25);
+    buttons[i].interval(20);
   }
   //screen setup
   /*
@@ -211,14 +228,76 @@ void setup()
 
 void loop()
 {
-  action = 0;
+  current_action = NONE;
   for (int i = 0; i < NUM_BUTTONS; i++)
   {
     buttons[i].update();
     if (buttons[i].fell())
     {
       Serial.printf("%d fell.\n", i);
-      action = i;
+      current_action = static_cast<action> (i);
     }
+
   }
+  //structure for menu
+  switch (current_mode)
+  {
+  case TASK:
+    tft.setTextSize(5);
+    tft.drawString("TASK", 25, 180);
+    if (current_action == ONE)
+    {
+      tft.drawString("BUTTON1", 0, 0);
+    }
+    if (current_action == TWO)
+    {
+      tft.drawString("BUTTON2", 0, 0);
+    }
+    if (current_action == THREE)
+    {
+      tft.drawString("BUTTON3", 0, 0);
+    }
+    if (current_action == LEFT)
+    {
+      current_mode = SETTING;
+      tft.fillScreen(MEE_LIGHTPURPLE);
+    }
+    if (current_action == RIGHT)
+    {
+      current_mode = CLOCK;
+      tft.fillScreen(MEE_LIGHTPURPLE);
+    }
+    break;
+  case CLOCK:
+    tft.drawString("CLOCK", 25, 180);
+    if (current_action == LEFT)
+    {
+      current_mode = TASK;
+      tft.fillScreen(MEE_LIGHTPURPLE);
+    }
+    if (current_action == RIGHT)
+    {
+      current_mode = SETTING;
+      tft.fillScreen(MEE_LIGHTPURPLE);
+    }
+    break;
+  case SETTING:
+    tft.drawString("SETTING", 25, 180);
+    if (current_action == LEFT)
+    {
+      current_mode = CLOCK;
+      tft.fillScreen(MEE_LIGHTPURPLE);
+    }
+    if (current_action == RIGHT)
+    {
+      current_mode = TASK;
+      tft.fillScreen(MEE_LIGHTPURPLE);
+    }
+    break;
+  }
+
+    if (current_action == PUSH)
+    {
+      tft.drawString("PUSH", 0, 40);
+    }
 }
