@@ -11,6 +11,7 @@
 #define SCREEN_WIDTH 320
 #define SCREEN_HEIGHT 240
 
+//tft color format rgb565
 #define MEE_GREYPURPLE 0x526B
 #define MEE_LIGHTPURPLE 0xE71F
 
@@ -22,6 +23,9 @@ int check_setting = 0;
 
 int text_height = 0;
 int text_width = 0;
+
+int cursor_position = 0;
+int mode = 0;
 
 //star
 #define NSTARS 1024
@@ -220,7 +224,7 @@ void setup()
   zc = random(256);
   zx = random(256);
 
-  tft.fillScreen(TFT_BLACK);
+  tft.fillScreen(MEE_LIGHTPURPLE);
   //drawConnect();
 }
 
