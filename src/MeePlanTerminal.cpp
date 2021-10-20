@@ -147,10 +147,10 @@ void drawArrows()
   tft.fillTriangle(270, 190, 290, 230, 310, 190, TFT_DARKGREY);
 }
 
-void updateCursor(uint32_t color)
+void updateCursor(uint32_t color, uint32_t cs_color)
 {
-  tft.fillRect(0,32,25,SCREEN_HEIGHT-32, MEE_LIGHTPURPLE);
-  tft.setTextColor(TFT_BLACK);
+  tft.fillRect(0, 32, 25, SCREEN_HEIGHT - 32, color);
+  tft.setTextColor(cs_color);
   tft.setTextDatum(TL_DATUM);
   tft.setTextSize(2);
   tft.drawString(">",10,50 + (cursor_position*50));
@@ -304,7 +304,7 @@ void loop()
     tft.setTextColor(TFT_BLACK, MEE_LIGHTPURPLE);
     if (is_draw == 0)
     {
-      updateCursor(MEE_LIGHTPURPLE);
+      updateCursor(MEE_LIGHTPURPLE,TFT_BLACK);
       tft.setTextSize(5);
       tft.drawString("TASK", 25, 180);
       is_draw = 1;
@@ -328,7 +328,7 @@ void loop()
       }else if(cursor_position>0){
         cursor_position--;
       }
-      updateCursor(TFT_BLACK);
+      updateCursor(MEE_LIGHTPURPLE,TFT_BLACK);
     }
     if (current_action == DOWN)
     {
@@ -339,7 +339,7 @@ void loop()
       }else if(cursor_position<3){
         cursor_position++;
       }
-      updateCursor(TFT_BLACK);
+      updateCursor(MEE_LIGHTPURPLE,TFT_BLACK);
     }
     if (current_action == PUSH)
     {
