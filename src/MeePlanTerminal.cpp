@@ -3,10 +3,14 @@
 
 #include <ArduinoJson.h>
 #include <rpcWiFi.h>
+#include <DNSServer.h>
+#include <WebServer.h>
+#include <WiFiManager.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <Bounce2.h>
 #include "TFT_eSPI.h"
+
 #include "Free_Fonts.h"
 
 //tft color format rgb565
@@ -37,12 +41,10 @@ enum action
 };
 
 Bounce *buttons = new Bounce[NUM_BUTTONS];
-
+WiFiManager wifiManager;
 TFT_eSPI tft;
-const char *ssid = "wifi here";
-const char *password = "password here";
+
 int check_menu_logo = 0;
-int check_setting = 0;
 unsigned long tick_now = 0;
 
 int text_height = 0;
@@ -57,7 +59,9 @@ String taskmsg1[4] = {"TEST MSG LINE ONE ^_^", "TEST MSG TWO ONE  T_T", "TEST MS
 String taskmsg2[4] = {"TEST MSG LINE TWO T_T", "TEST MSG TWO TWO  ^_^", "TEST MSG THREE TWOT_T", "GIVE ME MONEY"};
 String taskdue[4] = {"15/12/2021 00:00", "15/12/2021 01:00", "15/12/2021 02:00", "69/96/2021 02:00"};
 
-const String settingtext[4] = {"Option 1", "Option 2", "Option 3", "Option 4"};
+String settingtext[4] = {"About MeePlan", "Reset Wifi setting", "Current Wifi: ", "Reboot"};
+String settingtext2[4] = {"", "", "", ""};
+
 
 int taskstype[4] = {2, 1, 0, 3};
 int tasksstatus[4] = {0, 1, 0, 1};
@@ -200,7 +204,7 @@ void MeePlan_Logo()
         tft.drawString("click to continue..", 60, 180);
       }
       blink = !blink;
-  
+
       tick_now = millis();
     }
     for (int i = 0; i < NUM_BUTTONS; i++)
@@ -268,33 +272,40 @@ void drawTask(uint32_t x, uint32_t y, int type, int status, const char *msg1, co
   tft.setTextDatum(TL_DATUM);
 }
 
-void drawConnect()
+void wifiConnect(const char *ssid)
 {
-  tft.fillScreen(MEE_GREYPURPLE);
-  tft.setFreeFont(&FreeSansBoldOblique18pt7b);
-  tft.setTextColor(TFT_WHITE);
-  tft.setTextSize(1);
-  tft.drawString("> Connect WIFI", 25, 20);
-  tft.drawString("\" Mee Plan \"", 60, 100);
-  while (check_setting != 1)
+  while (!WiFi.isConnected())
   {
+    tft.fillScreen(MEE_GREYPURPLE);
+    tft.setFreeFont(&FreeSansBoldOblique18pt7b);
+    tft.setTextColor(TFT_WHITE);
+    tft.setTextSize(1);
+
+    tft.drawString("> Connect WIFI", 25, 20);
     tft.setFreeFont(&FreeSansBoldOblique12pt7b);
+    tft.drawString("\" MeePlanTerm \"", 55, 100);
+    
     tft.setTextColor(TFT_GREEN);
     tft.setTextSize(1);
     tft.drawString("waiting for connection..", 25, 180);
-    text_height = tft.fontHeight();
-    text_width = tft.textWidth("waiting for connection..");
-    tft.fillRect(25, 180, text_width, text_height, MEE_GREYPURPLE);
-    delay(800);
-    tft.drawString("waiting for connection..", 25, 180);
-    delay(800);
+    wifiManager.autoConnect(ssid);
   }
+  settingtext2[2] = WiFi.SSID();
 }
 
 void setup()
 {
+  char ssidapname[16] = "MeePlanTerm";
+  const char *ssidap = ssidapname;
+  /*if(!wifiManager.autoConnect(ssidap)) {
+    Serial.println("failed to connect, we should reset as see if it connects");
+    delay(3000);
+  } */
+
   tft.begin();
   tft.setRotation(3);
+  wifiConnect(ssidap);
+  Serial.println(WiFi.SSID());
   for (int i = 0; i < NUM_BUTTONS; i++)
   {
     buttons[i].attach(BUTTON_PINS[i], INPUT_PULLUP); //setup the bounce instance for the current button
@@ -322,6 +333,7 @@ void loop()
   switch (current_mode)
   {
   case TASK:
+    tft.setTextFont(1);
     tft.setTextColor(TFT_BLACK, MEE_LIGHTPURPLE);
     if (is_draw == 0)
     {
@@ -375,6 +387,7 @@ void loop()
     }
     break;
   case CLOCK:
+    tft.setTextFont(1);
     tft.setTextColor(TFT_BLACK, MEE_LIGHTPURPLE);
     if (is_draw == 0)
     {
@@ -395,14 +408,16 @@ void loop()
     }
     break;
   case SETTING:
+    tft.setTextFont(1);
     tft.setTextColor(TFT_BLACK, MEE_GREYPURPLE);
     if (is_draw == 0)
     {
       tft.drawString("SETTING", 25, 180);
       updateCursor(MEE_GREYPURPLE, TFT_WHITE);
+      Serial.println(settingtext[2]);
       for (int i = 0; i < 4; i++)
       {
-        drawTask(30, 35 + (i * 50), 4, 2, settingtext[i].c_str(), "", "");
+        drawTask(30, 35 + (i * 50), 4, 2, settingtext[i].c_str(), settingtext2[i].c_str(), "");
       }
       is_draw = 1;
     }
@@ -426,6 +441,11 @@ void loop()
       else if (cursor_position == 1)
       {
         tft.drawCircle(10, 10, 5, TFT_RED);
+        wifiManager.resetSettings();
+        wifiConnect("MeePlanTerm");
+        is_draw = 0;
+        fillMenu(MEE_GREYPURPLE);
+        drawTab();
       }
       else if (cursor_position == 2)
       {
@@ -434,6 +454,7 @@ void loop()
       else if (cursor_position == 3)
       {
         tft.drawCircle(10, 10, 5, TFT_YELLOW);
+        NVIC_SystemReset();
       }
     }
     if (current_action == UP)
