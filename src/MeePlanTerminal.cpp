@@ -300,11 +300,12 @@ void setup()
     buttons[i].attach(BUTTON_PINS[i], INPUT_PULLUP); //setup the bounce instance for the current button
     buttons[i].interval(20);
   }
+  /*
   za = random(256);
   zb = random(256);
   zc = random(256);
   zx = random(256);
-
+  */
   tft.fillScreen(MEE_LIGHTPURPLE);
 
   //drawConnect();
