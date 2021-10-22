@@ -44,7 +44,7 @@ Bounce *buttons = new Bounce[NUM_BUTTONS];
 WiFiManager wifiManager;
 TFT_eSPI tft;
 
-int check_menu_logo = 0;
+bool check_menu_logo = false;
 unsigned long tick_now = 0;
 
 int text_height = 0;
@@ -66,7 +66,7 @@ String settingtext2[4] = {"", "", "", ""};
 int taskstype[4] = {2, 1, 0, 3};
 int tasksstatus[4] = {0, 1, 0, 1};
 
-int is_draw = 0;
+bool is_draw = false;
 int is_draw_top = 0;
 int cursor_position = 0;
 enum action current_action = NONE;
@@ -186,8 +186,8 @@ void MeePlan_Logo()
   tft.setTextColor(TFT_WHITE);
   tft.setTextSize(1);
   tft.drawString("Mee Plan", 60, 100);
-  check_menu_logo = 0;
-  while (check_menu_logo != 1)
+  check_menu_logo = false;
+  while (check_menu_logo != true)
   {
     tft.setFreeFont(&FreeSansBoldOblique12pt7b);
     tft.setTextColor(TFT_LIGHTGREY);
@@ -212,7 +212,7 @@ void MeePlan_Logo()
       buttons[i].update();
       if (buttons[i].fell())
       {
-        check_menu_logo = 1;
+        check_menu_logo = true;
       }
     }
   }
@@ -328,19 +328,19 @@ void loop()
 {
   tft.setTextSize(5);
   updateKey();
-
+  
   //structure for menu
   switch (current_mode)
   {
   case TASK:
     tft.setTextFont(1);
     tft.setTextColor(TFT_BLACK, MEE_LIGHTPURPLE);
-    if (is_draw == 0)
+    if (is_draw == false)
     {
       updateCursor(MEE_LIGHTPURPLE, TFT_BLACK);
       tft.setTextSize(5);
       tft.drawString("TASK", 25, 180);
-      is_draw = 1;
+      is_draw = true;
       for (int i = 0; i < taskcount; i++)
       {
         drawTask(30, 35 + (i * 50), taskstype[i], tasksstatus[i], taskmsg1[i].c_str(), taskmsg2[i].c_str(), taskdue[i].c_str());
@@ -351,7 +351,7 @@ void loop()
       current_mode = CLOCK;
       fillMenu(MEE_LIGHTPURPLE);
       cursor_position = 0;
-      is_draw = 0;
+      is_draw = false;
     }
     if (current_action == UP)
     {
@@ -389,28 +389,28 @@ void loop()
   case CLOCK:
     tft.setTextFont(1);
     tft.setTextColor(TFT_BLACK, MEE_LIGHTPURPLE);
-    if (is_draw == 0)
+    if (is_draw == false)
     {
       tft.drawString("CLOCK", 25, 180);
-      is_draw = 1;
+      is_draw = true;
     }
     if (current_action == TWO)
     {
       current_mode = TASK;
       fillMenu(MEE_LIGHTPURPLE);
-      is_draw = 0;
+      is_draw = false;
     }
     if (current_action == THREE)
     {
       current_mode = SETTING;
       fillMenu(MEE_GREYPURPLE);
-      is_draw = 0;
+      is_draw = false;
     }
     break;
   case SETTING:
     tft.setTextFont(1);
     tft.setTextColor(TFT_BLACK, MEE_GREYPURPLE);
-    if (is_draw == 0)
+    if (is_draw == false)
     {
       tft.drawString("SETTING", 25, 180);
       updateCursor(MEE_GREYPURPLE, TFT_WHITE);
@@ -419,14 +419,14 @@ void loop()
       {
         drawTask(30, 35 + (i * 50), 4, 2, settingtext[i].c_str(), settingtext2[i].c_str(), "");
       }
-      is_draw = 1;
+      is_draw = true;
     }
     if (current_action == TWO)
     {
       current_mode = CLOCK;
       fillMenu(MEE_LIGHTPURPLE);
       cursor_position = 0;
-      is_draw = 0;
+      is_draw = false;
     }
     if (current_action == PUSH)
     {
@@ -434,7 +434,7 @@ void loop()
       if (cursor_position == 0)
       {
         MeePlan_Logo();
-        is_draw = 0;
+        is_draw = false;
         fillMenu(MEE_GREYPURPLE);
         drawTab();
       }
@@ -443,7 +443,7 @@ void loop()
         tft.drawCircle(10, 10, 5, TFT_RED);
         wifiManager.resetSettings();
         wifiConnect("MeePlanTerm");
-        is_draw = 0;
+        is_draw = false;
         fillMenu(MEE_GREYPURPLE);
         drawTab();
       }
