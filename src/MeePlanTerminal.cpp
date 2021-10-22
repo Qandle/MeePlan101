@@ -47,7 +47,7 @@ Bounce *buttons = new Bounce[NUM_BUTTONS];
 WiFiManager wifiManager;
 TFT_eSPI tft;
 RTC_SAMD51 rtc;
-DateTime now = DateTime(F(__DATE__), F(__TIME__));
+//DateTime now = DateTime(F(__DATE__), F(__TIME__));
 
 bool check_menu_logo = false;
 unsigned long tick_now = 0;
@@ -77,7 +77,16 @@ int cursor_position = 0;
 enum action current_action = NONE;
 enum mode current_mode = TASK;
 
-//star
+
+unsigned int localPort = 2390;
+char timeServer[] = "1.th.pool.ntp.org";
+const int NTP_PACKET_SIZE = 48;
+byte packetBuffer[NTP_PACKET_SIZE];
+DateTime now;
+WiFiUDP udp;
+unsigned long devicetime;
+
+
 #define NSTARS 1024
 uint8_t sx[NSTARS] = {};
 uint8_t sy[NSTARS] = {};
@@ -133,6 +142,53 @@ void star_bg()
   unsigned long t1 = micros();
   //static char timeMicros[8] = {};
 }
+
+unsigned long sendNTPpacket(const char* address) {
+    for (int i = 0; i < NTP_PACKET_SIZE; ++i) {
+        packetBuffer[i] = 0;
+    }
+    packetBuffer[0] = 0b11100011;   
+    packetBuffer[1] = 0;   
+    packetBuffer[2] = 6;  
+    packetBuffer[3] = 0xEC;  
+    packetBuffer[12] = 49;
+    packetBuffer[13] = 0x4E;
+    packetBuffer[14] = 49;
+    packetBuffer[15] = 52;
+    udp.beginPacket(address, 123);
+    udp.write(packetBuffer, NTP_PACKET_SIZE);
+    udp.endPacket();
+}
+ 
+unsigned long getNTPtime() {
+    if (WiFi.status() == WL_CONNECTED) {
+        udp.begin(WiFi.localIP(), localPort);
+        sendNTPpacket(timeServer);
+        delay(1000);
+        if (udp.parsePacket()) {
+            udp.read(packetBuffer, NTP_PACKET_SIZE);
+            unsigned long highWord = word(packetBuffer[40], packetBuffer[41]);
+            unsigned long lowWord = word(packetBuffer[42], packetBuffer[43]);
+            unsigned long secsSince1900 = highWord << 16 | lowWord;
+            const unsigned long seventyYears = 2208988800UL;
+            unsigned long epoch = secsSince1900 - seventyYears;
+            long tzOffset = 25200UL;
+            unsigned long adjustedTime;
+            return adjustedTime = epoch + tzOffset;
+        }
+        else {
+            udp.stop();
+            return 0;
+        }
+        udp.stop();
+    }
+    else {
+        return 0;
+    }
+ 
+}
+
+
 
 void drawSelectbox(int32_t x, int32_t y, uint32_t color)
 {
@@ -318,6 +374,8 @@ void setup()
 
   rtc.begin();
   rtc.adjust(now);
+  
+  
   now = rtc.now();
   Serial.print(now.year(), DEC);
   Serial.print('/');
@@ -331,6 +389,13 @@ void setup()
   Serial.print(':');
   Serial.print(now.second(), DEC);
   Serial.println();
+  
+  
+  devicetime = getNTPtime();
+    now = rtc.now();
+    rtc.adjust(DateTime(devicetime));
+    now = rtc.now();
+  
 
 
   for (int i = 0; i < NUM_BUTTONS; i++)
@@ -353,8 +418,6 @@ void loop()
 {
   tft.setTextSize(5);
   updateKey();
-  now = rtc.now();
-  
 
  //structure for menu
   switch (current_mode)
@@ -413,6 +476,7 @@ void loop()
     }
     break;
   case CLOCK:
+    now = rtc.now();
     tft.setTextFont(1);
     tft.setTextSize(5);
     tft.setTextColor(TFT_BLACK, MEE_LIGHTPURPLE);
