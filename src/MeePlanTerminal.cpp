@@ -3,6 +3,7 @@
 
 #include <ArduinoJson.h>
 #include <rpcWiFi.h>
+#include <rpcping.h>
 #include <DNSServer.h>
 #include <WebServer.h>
 #include <WiFiManager.h>
@@ -12,6 +13,7 @@
 #include "TFT_eSPI.h"
 #include <RTC_SAMD51.h>
 #include <DateTime.h>
+
 
 #include "Free_Fonts.h"
 
@@ -27,7 +29,7 @@ enum mode
 {
   TASK,
   CLOCK,
-  SETTING
+  SETTING,
 };
 enum action
 {
@@ -55,9 +57,9 @@ int text_height = 0;
 int text_width = 0;
 
 //for testing
-int taskcount = 4;
-int pgcount = 1;
-int currentpg = 1;
+int task_count = 4;
+int pg_count = 1;
+int current_pg = 1;
 
 String taskmsg1[4] = {"TEST MSG LINE ONE ^_^", "TEST MSG TWO ONE  T_T", "TEST MSG THREE ONE^_^", "I'M POOR"};
 String taskmsg2[4] = {"TEST MSG LINE TWO T_T", "TEST MSG TWO TWO  ^_^", "TEST MSG THREE TWOT_T", "GIVE ME MONEY"};
@@ -75,13 +77,14 @@ int cursor_position = 0;
 enum action current_action = NONE;
 enum mode current_mode = TASK;
 
-unsigned int localPort = 2390;
-char timeServer[] = "1.th.pool.ntp.org";
+unsigned int local_port = 2390;
+char time_server[] = "1.th.pool.ntp.org";
 const int NTP_PACKET_SIZE = 48;
-byte packetBuffer[NTP_PACKET_SIZE];
+byte packet_buffer[NTP_PACKET_SIZE];
 DateTime now;
 WiFiUDP udp;
-unsigned long devicetime;
+unsigned long device_time;
+char clock_text[] = "hh:mm";
 
 #define NSTARS 1024
 uint8_t sx[NSTARS] = {};
@@ -143,18 +146,18 @@ unsigned long sendNTPpacket(const char *address)
 {
   for (int i = 0; i < NTP_PACKET_SIZE; ++i)
   {
-    packetBuffer[i] = 0;
+    packet_buffer[i] = 0;
   }
-  packetBuffer[0] = 0b11100011;
-  packetBuffer[1] = 0;
-  packetBuffer[2] = 6;
-  packetBuffer[3] = 0xEC;
-  packetBuffer[12] = 49;
-  packetBuffer[13] = 0x4E;
-  packetBuffer[14] = 49;
-  packetBuffer[15] = 52;
+  packet_buffer[0] = 0b11100011;
+  packet_buffer[1] = 0;
+  packet_buffer[2] = 6;
+  packet_buffer[3] = 0xEC;
+  packet_buffer[12] = 49;
+  packet_buffer[13] = 0x4E;
+  packet_buffer[14] = 49;
+  packet_buffer[15] = 52;
   udp.beginPacket(address, 123);
-  udp.write(packetBuffer, NTP_PACKET_SIZE);
+  udp.write(packet_buffer, NTP_PACKET_SIZE);
   udp.endPacket();
 }
 
@@ -162,14 +165,14 @@ unsigned long getNTPtime()
 {
   if (WiFi.status() == WL_CONNECTED)
   {
-    udp.begin(WiFi.localIP(), localPort);
-    sendNTPpacket(timeServer);
+    udp.begin(WiFi.localIP(), local_port);
+    sendNTPpacket(time_server);
     delay(1000);
     if (udp.parsePacket())
     {
-      udp.read(packetBuffer, NTP_PACKET_SIZE);
-      unsigned long highWord = word(packetBuffer[40], packetBuffer[41]);
-      unsigned long lowWord = word(packetBuffer[42], packetBuffer[43]);
+      udp.read(packet_buffer, NTP_PACKET_SIZE);
+      unsigned long highWord = word(packet_buffer[40], packet_buffer[41]);
+      unsigned long lowWord = word(packet_buffer[42], packet_buffer[43]);
       unsigned long secsSince1900 = highWord << 16 | lowWord;
       const unsigned long seventyYears = 2208988800UL;
       unsigned long epoch = secsSince1900 - seventyYears;
@@ -212,6 +215,7 @@ void drawArrows()
 void updateCursor(uint32_t color, uint32_t cs_color)
 {
   tft.fillRect(0, 32, 25, SCREEN_HEIGHT - 32, color);
+  tft.setTextFont(1);
   tft.setTextColor(cs_color);
   tft.setTextDatum(TL_DATUM);
   tft.setTextSize(2);
@@ -237,6 +241,7 @@ void MeePlan_Logo()
   int blink = 0;
   tick_now = millis();
   tft.fillScreen(MEE_GREYPURPLE);
+  tft.setTextDatum(TL_DATUM);
   tft.setFreeFont(&FreeSansBoldOblique24pt7b);
   tft.setTextColor(TFT_WHITE);
   tft.setTextSize(1);
@@ -277,6 +282,7 @@ void MeePlan_Logo()
 
 void drawTask(uint32_t x, uint32_t y, int type, int status, const char *msg1, const char *msg2, const char *due)
 {
+  tft.setTextFont(1);
   tft.setTextColor(TFT_BLACK, MEE_LIGHTPURPLE);
   tft.setTextDatum(TL_DATUM);
   tft.setTextSize(2);
@@ -348,6 +354,21 @@ void wifiConnect(const char *ssid)
   settingtext2[2] = WiFi.SSID();
 }
 
+void setupScreen(uint32_t color, enum mode mode)
+{
+  switch (mode)
+  {
+  case CLOCK:
+    fillMenu(color);
+    tft.drawRect(0, 0, SCREEN_WIDTH, 32, TFT_LIGHTGREY);
+    tft.fillRect(0, 0, SCREEN_WIDTH, 32, TFT_LIGHTGREY);
+    break;
+  default:
+    fillMenu(color);
+    tft.drawRect(0, 0, SCREEN_WIDTH - 70, 32, TFT_LIGHTGREY);
+    tft.fillRect(0, 0, SCREEN_WIDTH - 70, 32, TFT_LIGHTGREY);
+  }
+}
 void setupScreen(uint32_t color)
 {
   fillMenu(color);
@@ -384,9 +405,13 @@ void setup()
   Serial.print(':');
   Serial.print(now.second(), DEC);
   Serial.println();
-
-  devicetime = getNTPtime();
-  rtc.adjust(DateTime(devicetime));
+  PingClass internet_test;
+  
+  if(internet_test.ping("8.8.8.8")){
+    device_time = getNTPtime();
+    rtc.adjust(DateTime(device_time));
+  }
+  
 
   for (int i = 0; i < NUM_BUTTONS; i++)
   {
@@ -406,21 +431,23 @@ void setup()
 void loop()
 {
   tft.setTextSize(5);
+  now = rtc.now();
   updateKey();
-
   //structure for menu
   switch (current_mode)
   {
   case TASK:
-    tft.setTextFont(1);
-    tft.setTextColor(TFT_BLACK, MEE_LIGHTPURPLE);
     if (is_draw == false)
     {
-      setupScreen(MEE_LIGHTPURPLE);
+      tft.setTextFont(1);
+      tft.setTextColor(TFT_BLACK, MEE_LIGHTPURPLE);
+      setupScreen(MEE_LIGHTPURPLE, TASK);
       updateCursor(MEE_LIGHTPURPLE, TFT_BLACK);
-      tft.setTextSize(5);
-      tft.drawString("TASK", 25, 180);
-      for (int i = 0; i < taskcount; i++)
+      tft.setTextSize(2);
+      tft.setTextDatum(CC_DATUM);
+      tft.drawString("TASK", SCREEN_WIDTH / 2, 18);
+      tft.setTextDatum(TL_DATUM);
+      for (int i = 0; i < task_count; i++)
       {
         drawTask(30, 35 + (i * 50), taskstype[i], tasksstatus[i], taskmsg1[i].c_str(), taskmsg2[i].c_str(), taskdue[i].c_str());
       }
@@ -434,9 +461,9 @@ void loop()
     }
     if (current_action == UP)
     {
-      if (currentpg != 1 && cursor_position == 0)
+      if (current_pg != 1 && cursor_position == 0)
       {
-        currentpg--;
+        current_pg--;
         cursor_position = 3;
       }
       else if (cursor_position > 0)
@@ -447,9 +474,9 @@ void loop()
     }
     if (current_action == DOWN)
     {
-      if (currentpg != pgcount && cursor_position == 3)
+      if (current_pg != pg_count && cursor_position == 3)
       {
-        currentpg--;
+        current_pg--;
         cursor_position = 0;
       }
       else if (cursor_position < 3)
@@ -465,17 +492,21 @@ void loop()
     }
     break;
   case CLOCK:
-    now = rtc.now();
     tft.setTextFont(1);
     tft.setTextSize(5);
     tft.setTextColor(TFT_BLACK, MEE_LIGHTPURPLE);
+    tft.setTextDatum(TL_DATUM);
     tft.drawString(now.timestamp(DateTime::timestampOpt::TIMESTAMP_TIME), 42, 100);
     tft.setTextSize(2);
     tft.drawString(now.timestamp(DateTime::timestampOpt::TIMESTAMP_DATE), 42, 140);
     if (is_draw == false)
     {
-      setupScreen(MEE_LIGHTPURPLE);
+      setupScreen(MEE_LIGHTPURPLE, CLOCK);
       tft.setTextSize(2);
+      tft.setTextDatum(CC_DATUM);
+      tft.setTextColor(TFT_BLACK, TFT_LIGHTGREY);
+      tft.drawString("CLOCK", SCREEN_WIDTH / 2, 18);
+      tft.setTextDatum(TL_DATUM);
       is_draw = true;
     }
     if (current_action == TWO)
@@ -490,13 +521,24 @@ void loop()
     }
     break;
   case SETTING:
-    tft.setTextFont(1);
-    tft.setTextColor(TFT_BLACK, MEE_GREYPURPLE);
     if (is_draw == false)
     {
-      setupScreen(MEE_GREYPURPLE);
-      tft.drawString("SETTING", 25, 180);
+      tft.setTextFont(1);
+      tft.setTextColor(TFT_BLACK, TFT_LIGHTGREY);
+      setupScreen(MEE_GREYPURPLE, SETTING);
+      tft.setTextSize(2);
+      tft.setTextDatum(CC_DATUM);
+      tft.drawString("SETTING", SCREEN_WIDTH / 2, 18);
+      tft.setTextDatum(TL_DATUM);
       updateCursor(MEE_GREYPURPLE, TFT_WHITE);
+      if (!WiFi.isConnected())
+      {
+        settingtext[2] = "Not Connected!";
+      }
+      else
+      {
+        settingtext[2] = "Connected";
+      }
       Serial.println(settingtext[2]);
       for (int i = 0; i < 4; i++)
       {
@@ -517,7 +559,7 @@ void loop()
       {
         MeePlan_Logo();
         is_draw = false;
-        setupScreen(MEE_GREYPURPLE);
+        setupScreen(MEE_GREYPURPLE, SETTING);
       }
       else if (cursor_position == 1)
       {
@@ -526,7 +568,7 @@ void loop()
         wifiConnect("MeePlanTerm");
         is_draw = false;
         fillMenu(MEE_GREYPURPLE);
-        setupScreen(MEE_GREYPURPLE);
+        setupScreen(MEE_GREYPURPLE, SETTING);
       }
       else if (cursor_position == 2)
       {
@@ -565,6 +607,13 @@ void loop()
     }
     break;
   }
-
-
+  if (current_mode != CLOCK)
+  {
+    tft.setTextFont(1);
+    tft.setTextSize(2.5);
+    tft.setTextColor(TFT_BLACK, TFT_LIGHTGREY);
+    strcpy(clock_text, "hh:mm");
+    tft.setTextDatum(TR_DATUM);
+    tft.drawString(now.toString(clock_text), 310, 10);
+  }
 }
