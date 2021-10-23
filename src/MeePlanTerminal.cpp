@@ -48,7 +48,7 @@ Bounce *buttons = new Bounce[NUM_BUTTONS];
 WiFiManager wifiManager;
 TFT_eSPI tft;
 RTC_SAMD51 rtc;
-//DateTime now = DateTime(F(__DATE__), F(__TIME__));
+PingClass internet_test;
 
 bool check_menu_logo = false;
 unsigned long tick_now = 0;
@@ -335,6 +335,7 @@ void drawTask(uint32_t x, uint32_t y, int type, int status, const char *msg1, co
 
 void wifiConnect(const char *ssid)
 {
+  tft.setTextDatum(TL_DATUM);
   while (!WiFi.isConnected())
   {
     tft.fillScreen(MEE_GREYPURPLE);
@@ -350,6 +351,9 @@ void wifiConnect(const char *ssid)
     tft.setTextSize(1);
     tft.drawString("waiting for connection..", 25, 180);
     wifiManager.autoConnect(ssid);
+    if (!internet_test.ping("8.8.8.8")){
+      continue;
+    }
   }
   settingtext2[2] = WiFi.SSID();
 }
@@ -405,12 +409,12 @@ void setup()
   Serial.print(':');
   Serial.print(now.second(), DEC);
   Serial.println();
-  PingClass internet_test;
+
   
-  if(internet_test.ping("8.8.8.8")){
-    device_time = getNTPtime();
-    rtc.adjust(DateTime(device_time));
-  }
+
+  device_time = getNTPtime();
+  rtc.adjust(DateTime(device_time));
+
   
 
   for (int i = 0; i < NUM_BUTTONS; i++)
@@ -559,7 +563,7 @@ void loop()
       {
         MeePlan_Logo();
         is_draw = false;
-        setupScreen(MEE_GREYPURPLE, SETTING);
+        setupScreen(MEE_GREYPURPLE);
       }
       else if (cursor_position == 1)
       {
@@ -568,7 +572,7 @@ void loop()
         wifiConnect("MeePlanTerm");
         is_draw = false;
         fillMenu(MEE_GREYPURPLE);
-        setupScreen(MEE_GREYPURPLE, SETTING);
+        setupScreen(MEE_GREYPURPLE);
       }
       else if (cursor_position == 2)
       {
