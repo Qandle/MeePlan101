@@ -14,7 +14,6 @@
 #include <RTC_SAMD51.h>
 #include <DateTime.h>
 
-
 #include "Free_Fonts.h"
 
 //tft color format rgb565
@@ -351,7 +350,8 @@ void wifiConnect(const char *ssid)
     tft.setTextSize(1);
     tft.drawString("waiting for connection..", 25, 180);
     wifiManager.autoConnect(ssid);
-    if (!internet_test.ping("8.8.8.8")){
+    if (!internet_test.ping("8.8.8.8"))
+    {
       continue;
     }
   }
@@ -410,12 +410,8 @@ void setup()
   Serial.print(now.second(), DEC);
   Serial.println();
 
-  
-
   device_time = getNTPtime();
   rtc.adjust(DateTime(device_time));
-
-  
 
   for (int i = 0; i < NUM_BUTTONS; i++)
   {
@@ -496,13 +492,7 @@ void loop()
     }
     break;
   case CLOCK:
-    tft.setTextFont(1);
-    tft.setTextSize(5);
-    tft.setTextColor(TFT_BLACK, MEE_LIGHTPURPLE);
-    tft.setTextDatum(TL_DATUM);
-    tft.drawString(now.timestamp(DateTime::timestampOpt::TIMESTAMP_TIME), 42, 100);
-    tft.setTextSize(2);
-    tft.drawString(now.timestamp(DateTime::timestampOpt::TIMESTAMP_DATE), 42, 140);
+
     if (is_draw == false)
     {
       setupScreen(MEE_LIGHTPURPLE, CLOCK);
@@ -513,6 +503,17 @@ void loop()
       tft.setTextDatum(TL_DATUM);
       is_draw = true;
     }
+    else
+    {
+      tft.setTextFont(1);
+      tft.setTextSize(5);
+      tft.setTextColor(TFT_BLACK, MEE_LIGHTPURPLE);
+      tft.setTextDatum(TL_DATUM);
+      tft.drawString(now.timestamp(DateTime::timestampOpt::TIMESTAMP_TIME), 42, 100);
+      tft.setTextSize(2);
+      tft.drawString(now.timestamp(DateTime::timestampOpt::TIMESTAMP_DATE), 42, 140);
+    }
+
     if (current_action == TWO)
     {
       current_mode = TASK;
