@@ -396,6 +396,13 @@ void setup()
 
   rtc.begin();
 
+  
+  if (WiFi.isConnected())
+  {
+    device_time = getNTPtime();
+    Serial.println(device_time);
+    rtc.adjust(DateTime(device_time));
+  }
   now = rtc.now();
   Serial.print(now.year(), DEC);
   Serial.print('/');
@@ -409,9 +416,6 @@ void setup()
   Serial.print(':');
   Serial.print(now.second(), DEC);
   Serial.println();
-
-  device_time = getNTPtime();
-  rtc.adjust(DateTime(device_time));
 
   for (int i = 0; i < NUM_BUTTONS; i++)
   {
