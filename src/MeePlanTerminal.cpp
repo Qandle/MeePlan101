@@ -85,6 +85,8 @@ WiFiUDP udp;
 unsigned long device_time;
 char clock_text[] = "hh:mm";
 
+
+/*
 #define NSTARS 1024
 uint8_t sx[NSTARS] = {};
 uint8_t sy[NSTARS] = {};
@@ -140,7 +142,7 @@ void star_bg()
   unsigned long t1 = micros();
   //static char timeMicros[8] = {};
 }
-
+*/
 unsigned long sendNTPpacket(const char *address)
 {
   for (int i = 0; i < NTP_PACKET_SIZE; ++i)
