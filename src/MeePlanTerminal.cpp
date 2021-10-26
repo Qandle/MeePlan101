@@ -1,5 +1,10 @@
-//Modifed from HTTPS GET Example
-//to call a REST api and displaying data on WIO Terminal's screen.
+// MeePlanTerminal.cpp
+
+#define _WEBSOCKETS_LOGLEVEL_ 3
+
+#define WEBSOCKETS_NETWORK_TYPE NETWORK_RTL8720DN
+
+#define BOARD_TYPE "SAMD SEEED_WIO_TERMINAL"
 
 #include <ArduinoJson.h>
 #include <rpcWiFi.h>
@@ -9,6 +14,8 @@
 #include <WiFiManager.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
+#include <WebSocketsClient_Generic.h>
+#include <SocketIOclient_Generic.h>
 #include <Bounce2.h>
 #include "TFT_eSPI.h"
 #include <RTC_SAMD51.h>
@@ -48,6 +55,8 @@ WiFiManager wifiManager;
 TFT_eSPI tft;
 RTC_SAMD51 rtc;
 PingClass internet_test;
+SocketIOclient socketIO;
+
 
 bool check_menu_logo = false;
 unsigned long tick_now = 0;
@@ -82,9 +91,10 @@ const int NTP_PACKET_SIZE = 48;
 byte packet_buffer[NTP_PACKET_SIZE];
 DateTime now;
 WiFiUDP udp;
+String server_IP = "192.168.1.111";
+uint16_t server_port = 8080;
 unsigned long device_time;
 char clock_text[] = "hh:mm";
-
 
 /*
 #define NSTARS 1024
@@ -143,6 +153,58 @@ void star_bg()
   //static char timeMicros[8] = {};
 }
 */
+
+//temporary
+void socketIOEvent(socketIOmessageType_t type, uint8_t *payload, size_t length)
+{
+  switch (type)
+  {
+  case sIOtype_DISCONNECT:
+    Serial.println("[IOc] Disconnected");
+    break;
+  case sIOtype_CONNECT:
+    Serial.print("[IOc] Connected to url: ");
+    Serial.println((char *)payload);
+
+    // join default namespace (no auto join in Socket.IO V3)
+    socketIO.send(sIOtype_CONNECT, "/");
+
+    break;
+  case sIOtype_EVENT:
+    Serial.print("[IOc] Get event: ");
+    Serial.println((char *)payload);
+
+    break;
+  case sIOtype_ACK:
+    Serial.print("[IOc] Get ack: ");
+    Serial.println(length);
+
+    //hexdump(payload, length);
+    break;
+  case sIOtype_ERROR:
+    Serial.print("[IOc] Get error: ");
+    Serial.println(length);
+
+    //hexdump(payload, length);
+    break;
+  case sIOtype_BINARY_EVENT:
+    Serial.print("[IOc] Get binary: ");
+    Serial.println(length);
+
+    //hexdump(payload, length);
+    break;
+  case sIOtype_BINARY_ACK:
+    Serial.print("[IOc] Get binary ack: ");
+    Serial.println(length);
+
+    //hexdump(payload, length);
+    break;
+
+  default:
+    break;
+  }
+}
+
 unsigned long sendNTPpacket(const char *address)
 {
   for (int i = 0; i < NTP_PACKET_SIZE; ++i)
@@ -398,7 +460,6 @@ void setup()
 
   rtc.begin();
 
-  
   if (WiFi.isConnected())
   {
     device_time = getNTPtime();
@@ -430,12 +491,17 @@ void setup()
   zc = random(256);
   zx = random(256);
   */
-
+  socketIO.setReconnectInterval(10000);
+  socketIO.setExtraHeaders("Authorization: 1234567890");
+  socketIO.begin(server_IP, server_port);
+  socketIO.loop();
+  socketIO.onEvent(socketIOEvent);
   setupScreen(MEE_LIGHTPURPLE);
 }
 
 void loop()
 {
+  socketIO.loop();
   tft.setTextSize(5);
   now = rtc.now();
   updateKey();
@@ -623,8 +689,11 @@ void loop()
     tft.setTextFont(1);
     tft.setTextSize(2.5);
     tft.setTextColor(TFT_BLACK, TFT_LIGHTGREY);
-    strcpy(clock_text, "hh:mm");
-    tft.setTextDatum(TR_DATUM);
-    tft.drawString(now.toString(clock_text), 310, 10);
+    if (WiFi.isConnected())
+    {
+      strcpy(clock_text, "hh:mm");
+      tft.setTextDatum(TR_DATUM);
+      tft.drawString(now.toString(clock_text), 310, 10);
+    }
   }
 }
