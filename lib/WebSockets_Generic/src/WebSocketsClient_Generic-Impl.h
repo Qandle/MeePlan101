@@ -393,7 +393,7 @@ void WebSocketsClient::loop()
       else if (!SSL_FINGERPRINT_IS_SET) 
       {
         // ESP32 has setInsecure() now from v1.0.6
-        //_client.ssl->setInsecure();    
+        //_client.ssl->setInsecure();    //not working
       }
 #elif defined(ESP8266)
       else if (!SSL_FINGERPRINT_IS_SET) 
@@ -420,7 +420,7 @@ void WebSocketsClient::loop()
         _client.ssl->setClientRSACert(_client_cert, _client_key);
         WSK_LOGWARN("[WS-Client] setting client certificate and key");
       }  
-#endif    // defined(ESP32) || (WEBSOCKETS_NETWORK_TYPE == NETWORK_RTL8720DN)
+#endif  //  defined(ESP32) || (WEBSOCKETS_NETWORK_TYPE == NETWORK_RTL8720DN)
     }
     else
     {
@@ -453,7 +453,7 @@ void WebSocketsClient::loop()
     WSK_LOGINFO3("[WS-Client] Calling _client.tcp->connect, _host =", _host, ", port =", _port); 
     
     int _connectResult = _client.tcp->connect(_host.c_str(), _port, WEBSOCKETS_TCP_TIMEOUT);
-    
+    //int _connectResult = 1;
     WSK_LOGINFO1("[WS-Client] Calling _client.tcp->connect, _connectResult =", _connectResult);
     
     if (_connectResult)
