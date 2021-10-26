@@ -567,6 +567,13 @@ void loop()
 
     if (is_draw == false)
     {
+      DynamicJsonDocument doc(2048);
+      JsonArray array = doc.to<JsonArray>();
+      array.add("time");
+      array.add(now.timestamp(DateTime::timestampOpt::TIMESTAMP_TIME));
+      String output;
+      serializeJson(array,output);
+      socketIO.sendEVENT(output);
       setupScreen(MEE_LIGHTPURPLE, CLOCK);
       tft.setTextSize(2);
       tft.setTextDatum(CC_DATUM);
@@ -694,6 +701,7 @@ void loop()
       strcpy(clock_text, "hh:mm");
       tft.setTextDatum(TR_DATUM);
       tft.drawString(now.toString(clock_text), 310, 10);
+      
     }
   }
 }
