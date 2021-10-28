@@ -57,8 +57,8 @@ RTC_SAMD51 rtc;
 PingClass internet_test;
 SocketIOclient socketIO;
 
-
 bool check_menu_logo = false;
+bool socket_connect = false;
 unsigned long tick_now = 0;
 
 int text_height = 0;
@@ -91,7 +91,7 @@ const int NTP_PACKET_SIZE = 48;
 byte packet_buffer[NTP_PACKET_SIZE];
 DateTime now;
 WiFiUDP udp;
-String server_IP = "192.168.1.111";
+String server_IP = "api.pannanap.pw";
 uint16_t server_port = 8080;
 unsigned long device_time;
 char clock_text[] = "hh:mm";
@@ -494,13 +494,29 @@ void setup()
   socketIO.setReconnectInterval(10000);
   socketIO.setExtraHeaders("Authorization: 1234567890");
   socketIO.begin(server_IP, server_port);
-  socketIO.loop();
   socketIO.onEvent(socketIOEvent);
   setupScreen(MEE_LIGHTPURPLE);
 }
 
 void loop()
 {
+  if (!socketIO.isConnected())
+  {
+    tft.setTextFont(1);
+    tft.setTextSize(1.5);
+    tft.setTextColor(TFT_BLACK, TFT_LIGHTGREY);
+    tft.setTextDatum(TC_DATUM);
+    tft.drawString("NOT CONNECTED", 160, 2);
+    socket_connect = false;
+  }
+  else if (!socket_connect)
+  {
+    is_draw = false;
+    socket_connect = true;
+    device_time = getNTPtime();
+    Serial.println(device_time);
+    rtc.adjust(DateTime(device_time));
+  }
   socketIO.loop();
   tft.setTextSize(5);
   now = rtc.now();
@@ -572,7 +588,7 @@ void loop()
       array.add("time");
       array.add(now.timestamp(DateTime::timestampOpt::TIMESTAMP_TIME));
       String output;
-      serializeJson(array,output);
+      serializeJson(array, output);
       socketIO.sendEVENT(output);
       setupScreen(MEE_LIGHTPURPLE, CLOCK);
       tft.setTextSize(2);
@@ -588,6 +604,7 @@ void loop()
       tft.setTextSize(5);
       tft.setTextColor(TFT_BLACK, MEE_LIGHTPURPLE);
       tft.setTextDatum(TL_DATUM);
+
       tft.drawString(now.timestamp(DateTime::timestampOpt::TIMESTAMP_TIME), 42, 100);
       tft.setTextSize(2);
       tft.drawString(now.timestamp(DateTime::timestampOpt::TIMESTAMP_DATE), 42, 140);
@@ -701,7 +718,6 @@ void loop()
       strcpy(clock_text, "hh:mm");
       tft.setTextDatum(TR_DATUM);
       tft.drawString(now.toString(clock_text), 310, 10);
-      
     }
   }
 }
