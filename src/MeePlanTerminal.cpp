@@ -666,10 +666,7 @@ void loop()
       {
         tft.drawCircle(10, 10, 5, TFT_RED);
         wifiManager.resetSettings();
-        wifiConnect("MeePlanTerm");
-        is_draw = false;
-        fillMenu(MEE_GREYPURPLE);
-        setupScreen(MEE_GREYPURPLE);
+        NVIC_SystemReset();
       }
       else if (cursor_position == 2)
       {
