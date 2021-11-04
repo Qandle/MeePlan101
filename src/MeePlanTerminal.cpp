@@ -49,6 +49,48 @@ enum action
   LEFT,
   NONE,
 };
+typedef enum tasktype
+{
+  GREEN,
+  YELLOW,
+  RED,
+  GREY,
+  BLACK,
+  OFF
+} task_type;
+
+class Task
+{
+private:
+  char msgln1[22];
+  char msgln2[22];
+  char dueText[33];
+  task_type type = OFF;
+  int status = 2;
+
+public:
+  char *getNameLine1() { return msgln1; }
+  char *getNameLine2() { return msgln2; }
+  char *getDueText() { return dueText; };
+  task_type getType() { return type; };
+  int getStatus() { return status; };
+  void setType(task_type tasktype) { this->type = tasktype; };
+  void setStatus(int taskstatus) { this->status = taskstatus; };
+  void setText(char msg1[], char msg2[], char due[]);
+  Task()
+  {
+    memset(msgln1, '\0', sizeof(msgln1));
+    memset(msgln2, '\0', sizeof(msgln2));
+    memset(dueText, '\0', sizeof(dueText));
+  };
+};
+
+void Task::setText(char msg1[22], char msg2[22], char due[])
+{
+  memcpy(this->msgln1, msg1, sizeof(msgln1));
+  memcpy(this->msgln2, msg2, sizeof(msgln2));
+  memcpy(this->dueText, due, sizeof(dueText));
+}
 
 Bounce *buttons = new Bounce[NUM_BUTTONS];
 WiFiManager wifiManager;
@@ -69,15 +111,25 @@ int task_count = 4;
 int pg_count = 1;
 int current_pg = 1;
 
-String taskmsg1[4] = {"TEST MSG LINE ONE ^_^", "TEST MSG TWO ONE  T_T", "TEST MSG THREE ONE^_^", "I'M POOR"};
-String taskmsg2[4] = {"TEST MSG LINE TWO T_T", "TEST MSG TWO TWO  ^_^", "TEST MSG THREE TWOT_T", "GIVE ME MONEY"};
-String taskdue[4] = {"15/12/2021 00:00", "15/12/2021 01:00", "15/12/2021 02:00", "69/96/2021 02:00"};
+Task taskList[4] = {Task(), Task(), Task(), Task()};
+
+void testTask()
+{
+  char* taskmsg1[4] = {"TEST MSG LINE ONE ^_^", "TEST MSG TWO ONE  T_T", "TEST MSG THREE ONE^_^", "I'M POOR"};
+  char* taskmsg2[4] = {"TEST MSG LINE TWO T_T", "TEST MSG TWO TWO  ^_^", "TEST MSG THREE TWOT_T", "GIVE ME MONEY"};
+  char* taskdue[4] = {"15/12/2021 00:00", "15/12/2021 01:00", "15/12/2021 02:00", "69/96/2021 02:00"};
+  int taskstype[4] = {2, 1, 0, 3};
+  int tasksstatus[4] = {0, 1, 0, 1};
+  for (int i = 0; i < 4; i++)
+  {
+    taskList[i].setText(taskmsg1[i],taskmsg2[i],taskdue[i]);
+    taskList[i].setType(static_cast<task_type>(taskstype[i]));
+    taskList[i].setStatus(tasksstatus[i]);
+  }
+}
 
 String settingtext[4] = {"About MeePlan", "Reset Wifi setting", "Current Wifi: ", "Reboot"};
 String settingtext2[4] = {"", "", "", ""};
-
-int taskstype[4] = {2, 1, 0, 3};
-int tasksstatus[4] = {0, 1, 0, 1};
 
 bool is_draw = false;
 int is_draw_top = 0;
@@ -343,7 +395,7 @@ void MeePlan_Logo()
   tft.setTextSize(2);
 }
 
-void drawTask(uint32_t x, uint32_t y, int type, int status, const char *msg1, const char *msg2, const char *due)
+void drawTask(uint32_t x, uint32_t y, task_type type, int status, const char *msg1, const char *msg2, const char *due)
 {
   tft.setTextFont(1);
   tft.setTextColor(TFT_BLACK, MEE_LIGHTPURPLE);
@@ -364,36 +416,43 @@ void drawTask(uint32_t x, uint32_t y, int type, int status, const char *msg1, co
 
   switch (type)
   {
-  case 0:
+  case GREEN:
     tft.setTextColor(TFT_BLACK, TFT_GREENYELLOW);
     drawSelectbox(x, y, TFT_GREENYELLOW);
     break;
-  case 1:
+  case YELLOW:
     tft.setTextColor(TFT_BLACK, TFT_YELLOW);
     drawSelectbox(x, y, TFT_YELLOW);
     break;
-  case 2:
+  case RED:
     tft.setTextColor(TFT_WHITE, TFT_RED);
     drawSelectbox(x, y, TFT_RED);
     break;
-  case 3:
+  case GREY:
     tft.setTextColor(TFT_WHITE, TFT_DARKGREY);
     drawSelectbox(x, y, TFT_DARKGREY);
     break;
-  default:
+  case BLACK:
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     drawSelectbox(x, y, TFT_BLACK);
     break;
+  case OFF:
+    break;
   }
-
-  tft.drawString(msg1, x + 5, y + 10);
-  tft.drawString(msg2, x + 5, y + 27);
-
-  tft.setTextDatum(TR_DATUM);
-  tft.setTextSize(1);
-  tft.drawString(due, x + 255, y + 1);
-
+  if (type != OFF)
+  {
+    tft.drawString(msg1, x + 5, y + 10);
+    tft.drawString(msg2, x + 5, y + 27);
+    tft.setTextDatum(TR_DATUM);
+    tft.setTextSize(1);
+    tft.drawString(due, x + 255, y + 1);
+  }
   tft.setTextDatum(TL_DATUM);
+}
+
+void drawTask(uint32_t x, uint32_t y, Task task)
+{
+  drawTask(x, y, task.getType(), task.getStatus(), task.getNameLine1(), task.getNameLine2(), task.getDueText());
 }
 
 void wifiConnect(const char *ssid)
@@ -480,6 +539,8 @@ void setup()
   Serial.print(now.second(), DEC);
   Serial.println();
 
+  testTask();
+  
   for (int i = 0; i < NUM_BUTTONS; i++)
   {
     buttons[i].attach(BUTTON_PINS[i], INPUT_PULLUP); //setup the bounce instance for the current button
@@ -537,7 +598,7 @@ void loop()
       tft.setTextDatum(TL_DATUM);
       for (int i = 0; i < task_count; i++)
       {
-        drawTask(30, 35 + (i * 50), taskstype[i], tasksstatus[i], taskmsg1[i].c_str(), taskmsg2[i].c_str(), taskdue[i].c_str());
+        drawTask(30, 35 + (i * 50), taskList[i]);
       }
       is_draw = true;
     }
@@ -575,8 +636,9 @@ void loop()
     }
     if (current_action == PUSH)
     {
-      tasksstatus[cursor_position] = !tasksstatus[cursor_position];
-      drawTask(30, 35 + (cursor_position * 50), taskstype[cursor_position], tasksstatus[cursor_position], taskmsg1[cursor_position].c_str(), taskmsg2[cursor_position].c_str(), taskdue[cursor_position].c_str());
+      if(taskList[cursor_position].getStatus() != 2)
+      taskList[cursor_position].setStatus(!taskList[cursor_position].getStatus());
+      drawTask(30, 35 + (cursor_position * 50), taskList[cursor_position]);
     }
     break;
   case CLOCK:
@@ -643,7 +705,7 @@ void loop()
       Serial.println(settingtext[2]);
       for (int i = 0; i < 4; i++)
       {
-        drawTask(30, 35 + (i * 50), 4, 2, settingtext[i].c_str(), settingtext2[i].c_str(), "");
+        drawTask(30, 35 + (i * 50), BLACK, 2, settingtext[i].c_str(), settingtext2[i].c_str(), "");
       }
       is_draw = true;
     }
