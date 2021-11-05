@@ -51,12 +51,12 @@ enum action
 };
 typedef enum tasktype
 {
+  OFF,
   GREEN,
   YELLOW,
   RED,
   GREY,
   BLACK,
-  OFF
 } task_type;
 
 class Task
@@ -67,6 +67,7 @@ private:
   char dueText[33];
   task_type type = OFF;
   int status = 2;
+  int id = -1;
 
 public:
   char *getNameLine1() { return msgln1; }
@@ -74,9 +75,10 @@ public:
   char *getDueText() { return dueText; };
   task_type getType() { return type; };
   int getStatus() { return status; };
+  int getID() { return id; };
   void setType(task_type tasktype) { this->type = tasktype; };
   void setStatus(int taskstatus) { this->status = taskstatus; };
-  void setText(char msg1[], char msg2[], char due[]);
+  void setText(const char msg1[], const char msg2[], const char due[]);
   Task()
   {
     memset(msgln1, '\0', sizeof(msgln1));
@@ -85,7 +87,7 @@ public:
   };
 };
 
-void Task::setText(char msg1[22], char msg2[22], char due[])
+void Task::setText(const char msg1[22], const char msg2[22], const char due[])
 {
   memcpy(this->msgln1, msg1, sizeof(msgln1));
   memcpy(this->msgln2, msg2, sizeof(msgln2));
@@ -115,14 +117,14 @@ Task taskList[4] = {Task(), Task(), Task(), Task()};
 
 void testTask()
 {
-  char* taskmsg1[4] = {"TEST MSG LINE ONE ^_^", "TEST MSG TWO ONE  T_T", "TEST MSG THREE ONE^_^", "I'M POOR"};
-  char* taskmsg2[4] = {"TEST MSG LINE TWO T_T", "TEST MSG TWO TWO  ^_^", "TEST MSG THREE TWOT_T", "GIVE ME MONEY"};
-  char* taskdue[4] = {"15/12/2021 00:00", "15/12/2021 01:00", "15/12/2021 02:00", "69/96/2021 02:00"};
+  char *taskmsg1[4] = {"TEST MSG LINE ONE ^_^", "TEST MSG TWO ONE  T_T", "TEST MSG THREE ONE^_^", "I'M POOR"};
+  char *taskmsg2[4] = {"TEST MSG LINE TWO T_T", "TEST MSG TWO TWO  ^_^", "TEST MSG THREE TWOT_T", "GIVE ME MONEY"};
+  char *taskdue[4] = {"15/12/2021 00:00", "15/12/2021 01:00", "15/12/2021 02:00", "69/96/2021 02:00"};
   int taskstype[4] = {2, 1, 0, 3};
   int tasksstatus[4] = {0, 1, 0, 1};
   for (int i = 0; i < 4; i++)
   {
-    taskList[i].setText(taskmsg1[i],taskmsg2[i],taskdue[i]);
+    taskList[i].setText(taskmsg1[i], taskmsg2[i], taskdue[i]);
     taskList[i].setType(static_cast<task_type>(taskstype[i]));
     taskList[i].setStatus(tasksstatus[i]);
   }
@@ -143,7 +145,7 @@ const int NTP_PACKET_SIZE = 48;
 byte packet_buffer[NTP_PACKET_SIZE];
 DateTime now;
 WiFiUDP udp;
-String server_IP = "api.pannanap.pw";
+char server_IP[] = "api.pannanap.pw";
 uint16_t server_port = 8080;
 unsigned long device_time;
 char clock_text[] = "hh:mm";
@@ -206,9 +208,54 @@ void star_bg()
 }
 */
 
-//temporary
+void updateTaskPage(DynamicJsonDocument &payloadarray)
+{
+  JsonObject tasksobject = payloadarray[1].as<JsonObject>();
+  if (tasksobject.isNull())
+  {
+    return;
+  }
+  int tasksize = tasksobject["s"];
+  JsonArray tasksdata = tasksobject["data"].as<JsonArray>();
+  if (tasksobject.isNull())
+  {
+    return;
+  }
+  for (int i = 0; i < tasksize; i++)
+  {
+    const char *msg1 = tasksdata[i][0];
+    const char *msg2 = tasksdata[i][1];
+    const char *due = tasksdata[i][2];
+    taskList[i].setText(msg1, msg2, due);
+    taskList[i].setType(static_cast<task_type>(tasksdata[i][3].as<int>()));
+    taskList[i].setStatus(tasksdata[i][4]);
+  }
+  //serializeJson(tasksobject,Serial);
+  Serial.println(tasksize);
+}
+
+void serverEvent(uint8_t *payload, size_t length)
+{
+  DynamicJsonDocument doc(4096);
+  deserializeJson(doc, (char *)payload);
+  const char *event = doc[0];
+  Serial.println(event);
+  if (strcmp(event, "update") == 0)
+  {
+    updateTaskPage(doc);
+  }
+  else if (strcmp(event, "") == 0)
+  {
+  }
+  else
+  {
+    Serial.println("no match");
+  }
+}
+
 void socketIOEvent(socketIOmessageType_t type, uint8_t *payload, size_t length)
 {
+
   switch (type)
   {
   case sIOtype_DISCONNECT:
@@ -224,8 +271,8 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t *payload, size_t length)
     break;
   case sIOtype_EVENT:
     Serial.print("[IOc] Get event: ");
-    Serial.println((char *)payload);
-
+    Serial.println((const char *)payload);
+    serverEvent(payload, length);
     break;
   case sIOtype_ACK:
     Serial.print("[IOc] Get ack: ");
@@ -401,19 +448,6 @@ void drawTask(uint32_t x, uint32_t y, task_type type, int status, const char *ms
   tft.setTextColor(TFT_BLACK, MEE_LIGHTPURPLE);
   tft.setTextDatum(TL_DATUM);
   tft.setTextSize(2);
-
-  if (status == 0)
-  {
-    tft.fillRect(293, y + 12, 15, 20, TFT_WHITE);
-    tft.drawRect(293, y + 12, 15, 20, TFT_BLACK);
-  }
-  else if (status == 1)
-  {
-    tft.fillRect(293, y + 12, 15, 20, TFT_WHITE);
-    tft.drawRect(293, y + 12, 15, 20, TFT_BLACK);
-    tft.drawString("X", 295, y + 15);
-  }
-
   switch (type)
   {
   case GREEN:
@@ -446,6 +480,22 @@ void drawTask(uint32_t x, uint32_t y, task_type type, int status, const char *ms
     tft.setTextDatum(TR_DATUM);
     tft.setTextSize(1);
     tft.drawString(due, x + 255, y + 1);
+
+    tft.setTextColor(TFT_BLACK, TFT_WHITE);
+    tft.setTextDatum(TL_DATUM);
+    tft.setTextSize(2);
+
+    if (status == 0)
+    {
+      tft.fillRect(293, y + 12, 15, 20, TFT_WHITE);
+      tft.drawRect(293, y + 12, 15, 20, TFT_BLACK);
+    }
+    else if (status == 1)
+    {
+      tft.fillRect(293, y + 12, 15, 20, TFT_WHITE);
+      tft.drawRect(293, y + 12, 15, 20, TFT_BLACK);
+      tft.drawString("X", 295, y + 15);
+    }
   }
   tft.setTextDatum(TL_DATUM);
 }
@@ -463,12 +513,9 @@ void wifiConnect(const char *ssid)
     tft.fillScreen(MEE_GREYPURPLE);
     tft.setFreeFont(&FreeSansBoldOblique18pt7b);
     tft.setTextColor(TFT_WHITE);
-    tft.setTextSize(1);
-
     tft.drawString("> Connect WIFI", 25, 20);
     tft.setFreeFont(&FreeSansBoldOblique12pt7b);
     tft.drawString("\" MeePlanTerm \"", 55, 100);
-
     tft.setTextColor(TFT_GREEN);
     tft.setTextSize(1);
     tft.drawString("waiting for connection..", 25, 180);
@@ -479,6 +526,21 @@ void wifiConnect(const char *ssid)
     }
   }
   settingtext2[2] = WiFi.SSID();
+}
+
+void serverConnect()
+{
+  tft.setTextDatum(TL_DATUM);
+
+  tft.fillScreen(MEE_GREYPURPLE);
+  tft.setFreeFont(&FreeSansBoldOblique18pt7b);
+  tft.setTextColor(TFT_WHITE);
+  tft.setTextSize(1);
+  tft.setTextDatum(TC_DATUM);
+  tft.drawString("Connecting...", 160, 20);
+  tft.setFreeFont(&FreeSansBoldOblique12pt7b);
+  delay(500);
+  socketIO.loop();
 }
 
 void setupScreen(uint32_t color, enum mode mode)
@@ -539,8 +601,8 @@ void setup()
   Serial.print(now.second(), DEC);
   Serial.println();
 
-  testTask();
-  
+  //testTask();
+
   for (int i = 0; i < NUM_BUTTONS; i++)
   {
     buttons[i].attach(BUTTON_PINS[i], INPUT_PULLUP); //setup the bounce instance for the current button
@@ -556,6 +618,7 @@ void setup()
   socketIO.setExtraHeaders("Authorization: 1234567890");
   socketIO.begin(server_IP, server_port);
   socketIO.onEvent(socketIOEvent);
+  serverConnect();
   setupScreen(MEE_LIGHTPURPLE);
 }
 
@@ -588,6 +651,7 @@ void loop()
   case TASK:
     if (is_draw == false)
     {
+
       tft.setTextFont(1);
       tft.setTextColor(TFT_BLACK, MEE_LIGHTPURPLE);
       setupScreen(MEE_LIGHTPURPLE, TASK);
@@ -607,6 +671,16 @@ void loop()
       current_mode = CLOCK;
       cursor_position = 0;
       is_draw = false;
+    }
+    if (current_action == THREE)
+    {
+      DynamicJsonDocument doc(2048);
+      JsonArray array = doc.to<JsonArray>();
+      array.add("task");
+      String output;
+      serializeJson(array, output);
+      socketIO.sendEVENT(output);
+      is_draw = 0;
     }
     if (current_action == UP)
     {
@@ -636,8 +710,8 @@ void loop()
     }
     if (current_action == PUSH)
     {
-      if(taskList[cursor_position].getStatus() != 2)
-      taskList[cursor_position].setStatus(!taskList[cursor_position].getStatus());
+      if (taskList[cursor_position].getStatus() != 2)
+        taskList[cursor_position].setStatus(!taskList[cursor_position].getStatus());
       drawTask(30, 35 + (cursor_position * 50), taskList[cursor_position]);
     }
     break;
