@@ -20,6 +20,7 @@
 #include "TFT_eSPI.h"
 #include <RTC_SAMD51.h>
 #include <DateTime.h>
+#include <FlashStorage_SAMD.h>
 
 #include "Free_Fonts.h"
 
@@ -65,9 +66,9 @@ private:
   char msgln1[22];
   char msgln2[22];
   char dueText[33];
+  String id = "";
   task_type type = OFF;
   int status = 2;
-  int id = -1;
 
 public:
   char *getNameLine1() { return msgln1; }
@@ -75,10 +76,11 @@ public:
   char *getDueText() { return dueText; };
   task_type getType() { return type; };
   int getStatus() { return status; };
-  int getID() { return id; };
+  String getID() { return id; };
   void setType(task_type tasktype) { this->type = tasktype; };
   void setStatus(int taskstatus) { this->status = taskstatus; };
   void setText(const char msg1[], const char msg2[], const char due[]);
+  void setID(String ID) { this->id = String(ID); };
   Task()
   {
     memset(msgln1, '\0', sizeof(msgln1));
@@ -110,7 +112,7 @@ int text_width = 0;
 
 //for testing
 int task_count = 4;
-int pg_count = 1;
+int pg_count = 0;
 int current_pg = 1;
 
 Task taskList[4] = {Task(), Task(), Task(), Task()};
@@ -130,7 +132,7 @@ void testTask()
   }
 }
 
-String settingtext[4] = {"About MeePlan", "Reset Wifi setting", "Current Wifi: ", "Reboot"};
+String settingtext[4] = {"About MeePlan", "Wifi setting", "Reboot", "Factory Reset"};
 String settingtext2[4] = {"", "", "", ""};
 
 bool is_draw = false;
@@ -145,93 +147,66 @@ const int NTP_PACKET_SIZE = 48;
 byte packet_buffer[NTP_PACKET_SIZE];
 DateTime now;
 WiFiUDP udp;
-char server_IP[] = "api.pannanap.pw";
-uint16_t server_port = 8080;
+const char server_IP[] = "api.pannanap.pw";
+const uint16_t server_port = 8080;
 unsigned long device_time;
 char clock_text[] = "hh:mm";
 
-/*
-#define NSTARS 1024
-uint8_t sx[NSTARS] = {};
-uint8_t sy[NSTARS] = {};
-uint8_t sz[NSTARS] = {};
-uint8_t za, zb, zc, zx;
-uint8_t __attribute__((always_inline)) rng()
-{
-  zx++;
-  za = (za ^ zc ^ zx);
-  zb = (zb + za);
-  zc = ((zc + (zb >> 1)) ^ za);
-  return zc;
-}
+char id[] = "AFJKRS";
 
-void star_bg()
-{
-  unsigned long t0 = micros();
-  uint8_t spawnDepthVariation = 255;
-
-  for (int i = 0; i < NSTARS; ++i)
-  {
-    if (sz[i] <= 1)
-    {
-      sx[i] = 160 - 120 + rng();
-      sy[i] = rng();
-      sz[i] = spawnDepthVariation--;
-    }
-    else
-    {
-      int old_screen_x = ((int)sx[i] - 160) * 256 / sz[i] + 160;
-      int old_screen_y = ((int)sy[i] - 120) * 256 / sz[i] + 120;
-
-      // This is a faster pixel drawing function for occassions where many single pixels must be drawn
-      tft.drawPixel(old_screen_x, old_screen_y, TFT_BLACK);
-
-      sz[i] -= 2;
-      if (sz[i] > 1)
-      {
-        int screen_x = ((int)sx[i] - 160) * 256 / sz[i] + 160;
-        int screen_y = ((int)sy[i] - 120) * 256 / sz[i] + 120;
-
-        if (screen_x >= 0 && screen_y >= 0 && screen_x < 320 && screen_y < 240)
-        {
-          uint8_t r, g, b;
-          r = g = b = 255 - sz[i];
-          tft.drawPixel(screen_x, screen_y, tft.color565(r, g, b));
-        }
-        else
-          sz[i] = 0; // Out of screen, die.
-      }
-    }
-  }
-  unsigned long t1 = micros();
-  //static char timeMicros[8] = {};
-}
-*/
+FlashStorage(deviceID, char[7]);
 
 void updateTaskPage(DynamicJsonDocument &payloadarray)
-{
+{ //[event, {}]
   JsonObject tasksobject = payloadarray[1].as<JsonObject>();
   if (tasksobject.isNull())
   {
     return;
   }
-  int tasksize = tasksobject["s"];
+  task_count = tasksobject["s"];
+  current_pg = tasksobject["pg"];
+  pg_count = tasksobject["pgcount"];
   JsonArray tasksdata = tasksobject["data"].as<JsonArray>();
   if (tasksobject.isNull())
   {
     return;
   }
-  for (int i = 0; i < tasksize; i++)
+  for (int i = 0; i < task_count; i++)
   {
-    const char *msg1 = tasksdata[i][0];
-    const char *msg2 = tasksdata[i][1];
-    const char *due = tasksdata[i][2];
+    const char *msg1 = tasksdata[i][4];
+    const char *msg2 = tasksdata[i][5];
+    const char *due = tasksdata[i][3];
+    const char *objectID = tasksdata[i][0];
     taskList[i].setText(msg1, msg2, due);
-    taskList[i].setType(static_cast<task_type>(tasksdata[i][3].as<int>()));
-    taskList[i].setStatus(tasksdata[i][4]);
+    taskList[i].setType(static_cast<task_type>(tasksdata[i][1].as<int>()));
+    taskList[i].setID(objectID);
+    taskList[i].setStatus(tasksdata[i][2]);
   }
+  for (int i = 3; i > task_count; i--)
+  {
+    const char *msg1 = "";
+    const char *msg2 = "";
+    const char *due = "";
+    const char *objectID = "";
+    taskList[i].setText(msg1, msg2, due);
+    taskList[i].setType(OFF);
+    taskList[i].setID(objectID);
+    taskList[i].setStatus(0);
+  }
+  is_draw = false;
   //serializeJson(tasksobject,Serial);
-  Serial.println(tasksize);
+}
+
+void sendListiot(int pgnumber)
+{
+  DynamicJsonDocument temp(4096);
+  String output;
+  JsonArray array = temp.to<JsonArray>();
+  array.add("list_iot");
+  array[1]["pg"] = pgnumber;
+  serializeJson(array, output);
+  Serial.println(output);
+  socketIO.sendEVENT(output);
 }
 
 void serverEvent(uint8_t *payload, size_t length)
@@ -242,10 +217,11 @@ void serverEvent(uint8_t *payload, size_t length)
   Serial.println(event);
   if (strcmp(event, "update") == 0)
   {
-    updateTaskPage(doc);
+    sendListiot(current_pg);
   }
-  else if (strcmp(event, "") == 0)
+  else if (strcmp(event, "list_iot") == 0)
   {
+    updateTaskPage(doc);
   }
   else
   {
@@ -398,6 +374,15 @@ void updateKey()
   }
 }
 
+void generateDeviceID(char DeviceID[7])
+{
+  for (int i = 0; i < 6; i++)
+  {
+    DeviceID[i] = (char)random(65, 90);
+  }
+  DeviceID[6] = '\0';
+}
+
 void MeePlan_Logo()
 {
   int blink = 0;
@@ -423,7 +408,7 @@ void MeePlan_Logo()
       }
       else
       {
-        tft.drawString("click to continue..", 60, 180);
+        tft.drawString("Click to continue..", 60, 180);
       }
       blink = !blink;
 
@@ -525,7 +510,6 @@ void wifiConnect(const char *ssid)
       continue;
     }
   }
-  settingtext2[2] = WiFi.SSID();
 }
 
 void serverConnect()
@@ -584,10 +568,13 @@ void setup()
   if (WiFi.isConnected())
   {
     device_time = getNTPtime();
+
     Serial.println(device_time);
     rtc.adjust(DateTime(device_time));
   }
+
   now = rtc.now();
+  randomSeed(now.unixtime());
   Serial.print(now.year(), DEC);
   Serial.print('/');
   Serial.print(now.month(), DEC);
@@ -601,6 +588,8 @@ void setup()
   Serial.print(now.second(), DEC);
   Serial.println();
 
+  //generateDeviceID(id);
+  Serial.println(id);
   //testTask();
 
   for (int i = 0; i < NUM_BUTTONS; i++)
@@ -608,14 +597,11 @@ void setup()
     buttons[i].attach(BUTTON_PINS[i], INPUT_PULLUP); //setup the bounce instance for the current button
     buttons[i].interval(20);
   }
-  /*
-  za = random(256);
-  zb = random(256);
-  zc = random(256);
-  zx = random(256);
-  */
+
   socketIO.setReconnectInterval(10000);
-  socketIO.setExtraHeaders("Authorization: 1234567890");
+  String auth = "Authorization: ";
+  auth += id;
+  socketIO.setExtraHeaders(auth.c_str());
   socketIO.begin(server_IP, server_port);
   socketIO.onEvent(socketIOEvent);
   serverConnect();
@@ -637,9 +623,6 @@ void loop()
   {
     is_draw = false;
     socket_connect = true;
-    device_time = getNTPtime();
-    Serial.println(device_time);
-    rtc.adjust(DateTime(device_time));
   }
   socketIO.loop();
   tft.setTextSize(5);
@@ -651,7 +634,6 @@ void loop()
   case TASK:
     if (is_draw == false)
     {
-
       tft.setTextFont(1);
       tft.setTextColor(TFT_BLACK, MEE_LIGHTPURPLE);
       setupScreen(MEE_LIGHTPURPLE, TASK);
@@ -666,13 +648,7 @@ void loop()
       }
       is_draw = true;
     }
-    if (current_action == TWO)
-    {
-      current_mode = CLOCK;
-      cursor_position = 0;
-      is_draw = false;
-    }
-    if (current_action == THREE)
+    if (current_action == ONE)
     {
       DynamicJsonDocument doc(2048);
       JsonArray array = doc.to<JsonArray>();
@@ -682,12 +658,25 @@ void loop()
       socketIO.sendEVENT(output);
       is_draw = 0;
     }
+    if (current_action == TWO)
+    {
+      current_mode = CLOCK;
+      cursor_position = 0;
+      is_draw = false;
+    }
+    if (current_action == THREE)
+    {
+      current_mode = SETTING;
+      cursor_position = 0;
+      is_draw = false;
+    }
     if (current_action == UP)
     {
       if (current_pg != 1 && cursor_position == 0)
       {
         current_pg--;
         cursor_position = 3;
+        sendListiot(current_pg);
       }
       else if (cursor_position > 0)
       {
@@ -699,10 +688,11 @@ void loop()
     {
       if (current_pg != pg_count && cursor_position == 3)
       {
-        current_pg--;
+        current_pg++;
         cursor_position = 0;
+        sendListiot(current_pg);
       }
-      else if (cursor_position < 3)
+      else if (cursor_position < 3&& cursor_position!=task_count-1)
       {
         cursor_position++;
       }
@@ -770,11 +760,11 @@ void loop()
       updateCursor(MEE_GREYPURPLE, TFT_WHITE);
       if (!WiFi.isConnected())
       {
-        settingtext[2] = "Not Connected!";
+        settingtext2[1] = "Not Connected!";
       }
       else
       {
-        settingtext[2] = "Connected";
+        settingtext2[1] = WiFi.SSID();
       }
       Serial.println(settingtext[2]);
       for (int i = 0; i < 4; i++)
@@ -806,12 +796,11 @@ void loop()
       }
       else if (cursor_position == 2)
       {
-        tft.drawCircle(10, 10, 5, TFT_BLUE);
+        NVIC_SystemReset();
       }
       else if (cursor_position == 3)
       {
         tft.drawCircle(10, 10, 5, TFT_YELLOW);
-        NVIC_SystemReset();
       }
     }
     if (current_action == UP)
