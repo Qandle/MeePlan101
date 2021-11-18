@@ -22,6 +22,8 @@
 #include <DateTime.h>
 #include <FlashStorage_SAMD.h>
 
+#include "icon.h"
+
 #include "Free_Fonts.h"
 
 //tft color format rgb565
@@ -110,6 +112,9 @@ unsigned long tick_now = 0;
 int text_height = 0;
 int text_width = 0;
 
+const uint16_t iconWidth = 28;
+const uint16_t iconHeight = 28;
+
 //for testing
 int task_count = 4;
 int pg_count = 0;
@@ -136,7 +141,7 @@ String settingtext[4] = {"About MeePlan", "Wifi setting", "Reboot", "Factory Res
 String settingtext2[4] = {"", "", "", ""};
 
 bool is_draw = false;
-int is_draw_top = 0;
+bool is_draw_top = false;
 int cursor_position = 0;
 enum action current_action = NONE;
 enum mode current_mode = TASK;
@@ -155,6 +160,24 @@ char clock_text[] = "hh:mm";
 char id[] = "AFJKRS";
 
 FlashStorage(deviceID, char[7]);
+
+void fillMenu(uint32_t color)
+{
+  tft.fillRect(0, 32, SCREEN_WIDTH, SCREEN_HEIGHT - 32, color);
+}
+
+void editTask(int id, int status)
+{
+  DynamicJsonDocument temp(1024);
+  JsonArray array = temp.to<JsonArray>();
+  String output;
+  array[0] = "edit_iot";
+  array[1]["id"] = taskList[id].getID();
+  array[1]["done"] = status;
+  serializeJson(array, output);
+  Serial.println(output);
+  socketIO.sendEVENT(output);
+}
 
 void updateTaskPage(DynamicJsonDocument &payloadarray)
 { //[event, {}]
@@ -177,6 +200,7 @@ void updateTaskPage(DynamicJsonDocument &payloadarray)
     const char *msg2 = tasksdata[i][5];
     const char *due = tasksdata[i][3];
     const char *objectID = tasksdata[i][0];
+    Serial.println(objectID);
     taskList[i].setText(msg1, msg2, due);
     taskList[i].setType(static_cast<task_type>(tasksdata[i][1].as<int>()));
     taskList[i].setID(objectID);
@@ -193,8 +217,24 @@ void updateTaskPage(DynamicJsonDocument &payloadarray)
     taskList[i].setID(objectID);
     taskList[i].setStatus(0);
   }
-  is_draw = false;
+  is_draw = 0;
   //serializeJson(tasksobject,Serial);
+}
+
+void clearTask()
+{
+  for (int i = 0; i < task_count; i++)
+  {
+    const char *msg1 = "";
+    const char *msg2 = "";
+    const char *due = "";
+    const char *objectID = "";
+    taskList[i].setText(msg1, msg2, due);
+    taskList[i].setType(OFF);
+    taskList[i].setID(objectID);
+    taskList[i].setStatus(0);
+  }
+  task_count = 0;
 }
 
 void sendListiot(int pgnumber)
@@ -223,6 +263,7 @@ void serverEvent(uint8_t *payload, size_t length)
   {
     updateTaskPage(doc);
   }
+
   else
   {
     Serial.println("no match");
@@ -337,11 +378,6 @@ void drawSelectbox(int32_t x, int32_t y, uint32_t color)
   tft.fillRoundRect(x, y, 260, 45, 5, color);
 }
 
-void fillMenu(uint32_t color)
-{
-  tft.fillRect(0, 32, SCREEN_WIDTH, SCREEN_HEIGHT - 32, color);
-}
-
 void drawArrows()
 {
   tft.drawTriangle(270, 80, 290, 40, 310, 80, TFT_DARKGREY);
@@ -357,7 +393,7 @@ void updateCursor(uint32_t color, uint32_t cs_color)
   tft.setTextColor(cs_color);
   tft.setTextDatum(TL_DATUM);
   tft.setTextSize(2);
-  tft.drawString(">", 10, 50 + (cursor_position * 50));
+  tft.drawString(">", 10, 50 + (cursor_position * 46));
 }
 
 void updateKey()
@@ -392,23 +428,26 @@ void MeePlan_Logo()
   tft.setFreeFont(&FreeSansBoldOblique24pt7b);
   tft.setTextColor(TFT_WHITE);
   tft.setTextSize(1);
-  tft.drawString("Mee Plan", 60, 100);
+  tft.drawString("Mee Plan", 60, 85);
+  tft.setFreeFont(&FreeSansBold9pt7b);
+  tft.drawString("Device ID: ", 75, 150);
+  tft.drawString(id, 170, 150);
   check_menu_logo = false;
-  while (check_menu_logo != true)
+  while (!check_menu_logo)
   {
     tft.setFreeFont(&FreeSansBoldOblique12pt7b);
     tft.setTextColor(TFT_LIGHTGREY);
     text_height = tft.fontHeight();
-    text_width = tft.textWidth("click to continue..");
+    text_width = tft.textWidth("click to continue");
     if (millis() - tick_now > 500)
     {
       if (blink)
       {
-        tft.fillRect(60, 180, text_width, text_height, MEE_GREYPURPLE);
+        tft.fillRect(60, 180, text_width+10, text_height, MEE_GREYPURPLE);
       }
       else
       {
-        tft.drawString("Click to continue..", 60, 180);
+        tft.drawString("Click to continue", 60, 180);
       }
       blink = !blink;
 
@@ -426,6 +465,55 @@ void MeePlan_Logo()
   tft.setTextFont(1);
   tft.setTextSize(2);
 }
+
+void MeePlan_Setup()
+{
+  int blink = 0;
+  tick_now = millis();
+  tft.fillScreen(MEE_GREYPURPLE);
+  tft.setTextDatum(TL_DATUM);
+  tft.setFreeFont(&FreeSansBoldOblique12pt7b);
+  tft.setTextColor(TFT_WHITE);
+  tft.setTextSize(1);
+  tft.drawString("Enter device id in meeplan setting", 60, 85);
+  tft.setFreeFont(&FreeSansBold9pt7b);
+  tft.drawString("Device ID: ", 75, 150);
+  tft.drawString(id, 170, 150);
+  check_menu_logo = false;
+  while (!check_menu_logo)
+  {
+    tft.setFreeFont(&FreeSansBoldOblique12pt7b);
+    tft.setTextColor(TFT_LIGHTGREY);
+    text_height = tft.fontHeight();
+    text_width = tft.textWidth("click to continue");
+    if (millis() - tick_now > 500)
+    {
+      if (blink)
+      {
+        tft.fillRect(60, 180, text_width+10, text_height, MEE_GREYPURPLE);
+      }
+      else
+      {
+        tft.drawString("Click to continue", 60, 180);
+      }
+      blink = !blink;
+
+      tick_now = millis();
+    }
+    for (int i = 0; i < NUM_BUTTONS; i++)
+    {
+      buttons[i].update();
+      if (buttons[i].fell())
+      {
+        check_menu_logo = true;
+      }
+    }
+  }
+  tft.setTextFont(1);
+  tft.setTextSize(2);
+}
+
+
 
 void drawTask(uint32_t x, uint32_t y, task_type type, int status, const char *msg1, const char *msg2, const char *due)
 {
@@ -490,6 +578,34 @@ void drawTask(uint32_t x, uint32_t y, Task task)
   drawTask(x, y, task.getType(), task.getStatus(), task.getNameLine1(), task.getNameLine2(), task.getDueText());
 }
 
+void drawPageBar()
+{ 
+  if (pg_count != 0)
+  {
+    String temppg;
+    temppg += current_pg;
+    String temppgcount;
+    temppgcount += pg_count;
+    tft.setTextDatum(TC_DATUM);
+    tft.setTextColor(TFT_BLACK, MEE_LIGHTPURPLE);
+    tft.drawString("/", (SCREEN_WIDTH / 2), SCREEN_HEIGHT - 10);
+    tft.setTextSize(2);
+    if (current_pg != 1)
+      tft.drawString("<-", (SCREEN_WIDTH / 2) - 65, SCREEN_HEIGHT - 10);
+    tft.setTextDatum(TC_DATUM);
+    tft.drawString(temppg, (SCREEN_WIDTH / 2) - 30, SCREEN_HEIGHT - 10);
+    tft.setTextDatum(TC_DATUM);
+    tft.drawString(temppgcount, (SCREEN_WIDTH / 2) + 30, SCREEN_HEIGHT - 10);
+    if (current_pg != pg_count)
+    {
+      tft.setTextDatum(TC_DATUM);
+      tft.drawString("->", (SCREEN_WIDTH / 2) + 65, SCREEN_HEIGHT - 10);
+    }
+
+    //tft.drawString("/",SCREEN_WIDTH/2,SCREEN_HEIGHT-10);
+  }
+}
+
 void wifiConnect(const char *ssid)
 {
   tft.setTextDatum(TL_DATUM);
@@ -531,16 +647,19 @@ void setupScreen(uint32_t color, enum mode mode)
 {
   switch (mode)
   {
+  default:
+    fillMenu(color);
+    tft.drawRect(0, 0, SCREEN_WIDTH - 70, 32, TFT_LIGHTGREY);
+    tft.fillRect(0, 0, SCREEN_WIDTH - 70, 32, TFT_LIGHTGREY);
   case CLOCK:
     fillMenu(color);
     tft.drawRect(0, 0, SCREEN_WIDTH, 32, TFT_LIGHTGREY);
     tft.fillRect(0, 0, SCREEN_WIDTH, 32, TFT_LIGHTGREY);
     break;
-  default:
-    fillMenu(color);
-    tft.drawRect(0, 0, SCREEN_WIDTH - 70, 32, TFT_LIGHTGREY);
-    tft.fillRect(0, 0, SCREEN_WIDTH - 70, 32, TFT_LIGHTGREY);
   }
+  tft.pushImage(2, 2, iconWidth, iconHeight, taskicon);
+  tft.pushImage(30, 2, iconWidth, iconHeight, clockicon);
+  tft.pushImage(58, 2, iconWidth, iconHeight, settingicon);
 }
 void setupScreen(uint32_t color)
 {
@@ -549,14 +668,13 @@ void setupScreen(uint32_t color)
   tft.fillRect(0, 0, SCREEN_WIDTH, 32, TFT_LIGHTGREY);
 }
 
+void handleTaskAction();
+void handleOptionAction();
+
 void setup()
 {
   char ssidapname[16] = "MeePlanTerm";
   const char *ssidap = ssidapname;
-  /*if(!wifiManager.autoConnect(ssidap)) {
-    Serial.println("failed to connect, we should reset as see if it connects");
-    delay(3000);
-  } */
   rtc.begin();
   tft.begin();
   tft.setRotation(3);
@@ -617,14 +735,24 @@ void loop()
     tft.setTextColor(TFT_BLACK, TFT_LIGHTGREY);
     tft.setTextDatum(TC_DATUM);
     tft.drawString("NOT CONNECTED", 160, 2);
+    if (task_count != 0)
+    {
+      clearTask();
+      is_draw = false;
+      is_draw_top = false;
+    }
     socket_connect = false;
   }
   else if (!socket_connect)
   {
     is_draw = false;
+    is_draw_top = false;
     socket_connect = true;
   }
-  socketIO.loop();
+  if (WiFi.isConnected())
+  {
+    socketIO.loop();
+  }
   tft.setTextSize(5);
   now = rtc.now();
   updateKey();
@@ -632,90 +760,33 @@ void loop()
   switch (current_mode)
   {
   case TASK:
-    if (is_draw == false)
+    if (!is_draw)
     {
       tft.setTextFont(1);
-      tft.setTextColor(TFT_BLACK, MEE_LIGHTPURPLE);
-      setupScreen(MEE_LIGHTPURPLE, TASK);
-      updateCursor(MEE_LIGHTPURPLE, TFT_BLACK);
-      tft.setTextSize(2);
-      tft.setTextDatum(CC_DATUM);
-      tft.drawString("TASK", SCREEN_WIDTH / 2, 18);
       tft.setTextDatum(TL_DATUM);
+      if (!is_draw_top)
+      {
+        setupScreen(MEE_LIGHTPURPLE, TASK);
+        tft.setTextSize(2);
+        tft.setTextDatum(CC_DATUM);
+        tft.setTextColor(TFT_BLACK, TFT_LIGHTGREY);
+        tft.drawString("TASK", SCREEN_WIDTH / 2, 18);
+        is_draw_top = true;
+      }
+      fillMenu(MEE_LIGHTPURPLE);
       for (int i = 0; i < task_count; i++)
       {
-        drawTask(30, 35 + (i * 50), taskList[i]);
+        drawTask(30, 35 + (i * 46), taskList[i]);
       }
+      drawPageBar();
+      updateCursor(MEE_LIGHTPURPLE, TFT_BLACK);
       is_draw = true;
     }
-    if (current_action == ONE)
-    {
-      DynamicJsonDocument doc(2048);
-      JsonArray array = doc.to<JsonArray>();
-      array.add("task");
-      String output;
-      serializeJson(array, output);
-      socketIO.sendEVENT(output);
-      is_draw = 0;
-    }
-    if (current_action == TWO)
-    {
-      current_mode = CLOCK;
-      cursor_position = 0;
-      is_draw = false;
-    }
-    if (current_action == THREE)
-    {
-      current_mode = SETTING;
-      cursor_position = 0;
-      is_draw = false;
-    }
-    if (current_action == UP)
-    {
-      if (current_pg != 1 && cursor_position == 0)
-      {
-        current_pg--;
-        cursor_position = 3;
-        sendListiot(current_pg);
-      }
-      else if (cursor_position > 0)
-      {
-        cursor_position--;
-      }
-      updateCursor(MEE_LIGHTPURPLE, TFT_BLACK);
-    }
-    if (current_action == DOWN)
-    {
-      if (current_pg != pg_count && cursor_position == 3)
-      {
-        current_pg++;
-        cursor_position = 0;
-        sendListiot(current_pg);
-      }
-      else if (cursor_position < 3&& cursor_position!=task_count-1)
-      {
-        cursor_position++;
-      }
-      updateCursor(MEE_LIGHTPURPLE, TFT_BLACK);
-    }
-    if (current_action == PUSH)
-    {
-      if (taskList[cursor_position].getStatus() != 2)
-        taskList[cursor_position].setStatus(!taskList[cursor_position].getStatus());
-      drawTask(30, 35 + (cursor_position * 50), taskList[cursor_position]);
-    }
+    handleTaskAction();
     break;
   case CLOCK:
-
-    if (is_draw == false)
+    if (!is_draw)
     {
-      DynamicJsonDocument doc(2048);
-      JsonArray array = doc.to<JsonArray>();
-      array.add("time");
-      array.add(now.timestamp(DateTime::timestampOpt::TIMESTAMP_TIME));
-      String output;
-      serializeJson(array, output);
-      socketIO.sendEVENT(output);
       setupScreen(MEE_LIGHTPURPLE, CLOCK);
       tft.setTextSize(2);
       tft.setTextDatum(CC_DATUM);
@@ -735,20 +806,21 @@ void loop()
       tft.setTextSize(2);
       tft.drawString(now.timestamp(DateTime::timestampOpt::TIMESTAMP_DATE), 42, 140);
     }
-
-    if (current_action == TWO)
+    if (current_action == ONE)
     {
       current_mode = TASK;
       is_draw = false;
+      is_draw_top = false;
     }
     if (current_action == THREE)
     {
       current_mode = SETTING;
       is_draw = false;
+      is_draw_top = false;
     }
     break;
   case SETTING:
-    if (is_draw == false)
+    if (!is_draw)
     {
       tft.setTextFont(1);
       tft.setTextColor(TFT_BLACK, TFT_LIGHTGREY);
@@ -769,65 +841,12 @@ void loop()
       Serial.println(settingtext[2]);
       for (int i = 0; i < 4; i++)
       {
-        drawTask(30, 35 + (i * 50), BLACK, 2, settingtext[i].c_str(), settingtext2[i].c_str(), "");
+        drawTask(30, 35 + (i * 46), BLACK, 2, settingtext[i].c_str(), settingtext2[i].c_str(), "");
       }
       is_draw = true;
+      is_draw_top = true;
     }
-    if (current_action == TWO)
-    {
-      current_mode = CLOCK;
-      cursor_position = 0;
-      is_draw = false;
-    }
-    if (current_action == PUSH)
-    {
-      //might need to change this if more than 4 menu
-      if (cursor_position == 0)
-      {
-        MeePlan_Logo();
-        is_draw = false;
-        setupScreen(MEE_GREYPURPLE);
-      }
-      else if (cursor_position == 1)
-      {
-        tft.drawCircle(10, 10, 5, TFT_RED);
-        wifiManager.resetSettings();
-        NVIC_SystemReset();
-      }
-      else if (cursor_position == 2)
-      {
-        NVIC_SystemReset();
-      }
-      else if (cursor_position == 3)
-      {
-        tft.drawCircle(10, 10, 5, TFT_YELLOW);
-      }
-    }
-    if (current_action == UP)
-    {
-      if (cursor_position == 0)
-      {
-        cursor_position = 3;
-      }
-      else if (cursor_position > 0)
-      {
-        cursor_position--;
-      }
-      updateCursor(MEE_GREYPURPLE, TFT_WHITE);
-    }
-    if (current_action == DOWN)
-    {
-
-      if (cursor_position == 3)
-      {
-        cursor_position = 0;
-      }
-      else if (cursor_position < 3)
-      {
-        cursor_position++;
-      }
-      updateCursor(MEE_GREYPURPLE, TFT_WHITE);
-    }
+    handleOptionAction();
     break;
   }
   if (current_mode != CLOCK)
@@ -841,5 +860,150 @@ void loop()
       tft.setTextDatum(TR_DATUM);
       tft.drawString(now.toString(clock_text), 310, 10);
     }
+  }
+}
+
+void handleTaskAction()
+{
+  switch (current_action)
+  {
+  case NONE:
+    break;
+  case ONE:
+  {
+    DynamicJsonDocument doc(2048);
+    JsonArray array = doc.to<JsonArray>();
+    array.add("task");
+    String output;
+    serializeJson(array, output);
+    socketIO.sendEVENT(output);
+    is_draw = 0;
+  }
+  break;
+  case TWO:
+    current_mode = CLOCK;
+    cursor_position = 0;
+    is_draw_top = false;
+    is_draw = false;
+    break;
+  case THREE:
+    current_mode = SETTING;
+    cursor_position = 0;
+    is_draw_top = false;
+    is_draw = false;
+    break;
+  case UP:
+    if (cursor_position == 0)
+    {
+      cursor_position = 3;
+    }
+    else if (cursor_position > 0)
+    {
+      cursor_position--;
+    }
+    updateCursor(MEE_LIGHTPURPLE, TFT_BLACK);
+    break;
+  case DOWN:
+    if (cursor_position == 3)
+    {
+      cursor_position = 0;
+    }
+    else if (cursor_position < 3)
+    {
+      cursor_position++;
+    }
+    updateCursor(MEE_LIGHTPURPLE, TFT_BLACK);
+    break;
+  case LEFT:
+    if (current_pg > 1)
+    {
+      current_pg--;
+      sendListiot(current_pg);
+    }
+    break;
+  case RIGHT:
+    if (current_pg != pg_count)
+    {
+      current_pg++;
+      sendListiot(current_pg);
+    }
+    break;
+  case PUSH:
+    editTask(cursor_position, taskList[cursor_position].getStatus() == 0 ? 1 : 0);
+    break;
+  }
+}
+
+void handleOptionAction()
+{
+  switch (current_action)
+  {
+  case NONE:
+    break;
+  case ONE:
+    current_mode = TASK;
+    cursor_position = 0;
+    is_draw = false;
+    is_draw_top = false;
+    break;
+  case TWO:
+    current_mode = CLOCK;
+    cursor_position = 0;
+    is_draw = false;
+    is_draw_top = false;
+    break;
+  case THREE:
+    break;
+  case UP:
+    if (cursor_position == 0)
+    {
+      cursor_position = 3;
+    }
+    else if (cursor_position > 0)
+    {
+      cursor_position--;
+    }
+    updateCursor(MEE_GREYPURPLE, TFT_WHITE);
+    break;
+  case DOWN:
+    if (cursor_position == 3)
+    {
+      cursor_position = 0;
+    }
+    else if (cursor_position < 3)
+    {
+      cursor_position++;
+    }
+    updateCursor(MEE_GREYPURPLE, TFT_WHITE);
+    break;
+  case LEFT:
+    break;
+  case RIGHT:
+    break;
+  case PUSH:
+    if (cursor_position == 0)
+    {
+      if (socketIO.isConnected())
+      {
+      MeePlan_Logo();
+      is_draw = false;
+      setupScreen(MEE_GREYPURPLE);
+      }
+    }
+    else if (cursor_position == 1)
+    {
+      tft.drawCircle(10, 10, 5, TFT_RED);
+      wifiManager.resetSettings();
+      NVIC_SystemReset();
+    }
+    else if (cursor_position == 2)
+    {
+      NVIC_SystemReset();
+    }
+    else if (cursor_position == 3)
+    {
+      tft.drawCircle(10, 10, 5, TFT_YELLOW);
+    }
+    break;
   }
 }
