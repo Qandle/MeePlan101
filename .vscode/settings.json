@@ -8,6 +8,13 @@
         "vector": "cpp",
         "string_view": "cpp",
         "initializer_list": "cpp",
-        "memory": "cpp"
+        "memory": "cpp",
+        "*.tcc": "cpp",
+        "fstream": "cpp",
+        "istream": "cpp",
+        "limits": "cpp",
+        "sstream": "cpp",
+        "streambuf": "cpp",
+        "iosfwd": "cpp"
     }
 }

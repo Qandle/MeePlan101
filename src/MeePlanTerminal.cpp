@@ -20,12 +20,14 @@
 #include "TFT_eSPI.h"
 #include <RTC_SAMD51.h>
 #include <DateTime.h>
+#define FLASH_DEBUG 1
 #include <FlashStorage_SAMD.h>
 
 #include "icon.h"
 
 #include "Free_Fonts.h"
 
+const int WRITTEN_SIGNATURE = 133735;
 //tft color format rgb565
 #define MEE_GREYPURPLE 0x526B
 #define MEE_LIGHTPURPLE 0xE71F
@@ -115,7 +117,7 @@ int text_width = 0;
 const uint16_t iconWidth = 28;
 const uint16_t iconHeight = 28;
 
-//for testing
+//task storiung
 int task_count = 4;
 int pg_count = 0;
 int current_pg = 1;
@@ -146,6 +148,7 @@ int cursor_position = 0;
 enum action current_action = NONE;
 enum mode current_mode = TASK;
 
+//network related address and port
 unsigned int local_port = 2390;
 char time_server[] = "1.th.pool.ntp.org";
 const int NTP_PACKET_SIZE = 48;
@@ -153,13 +156,19 @@ byte packet_buffer[NTP_PACKET_SIZE];
 DateTime now;
 WiFiUDP udp;
 const char server_IP[] = "api.pannanap.pw";
-const uint16_t server_port = 8080;
+const uint16_t server_port = 80;
 unsigned long device_time;
 char clock_text[] = "hh:mm";
 
-char id[] = "AFJKRS";
+//for storing data on flash
+typedef struct
+{
+  char id[7];
+} DeviceSetting;
+DeviceSetting currentSetting;
 
-FlashStorage(deviceID, char[7]);
+int signature;
+int storedAddress = 0;
 
 void fillMenu(uint32_t color)
 {
@@ -221,6 +230,65 @@ void updateTaskPage(DynamicJsonDocument &payloadarray)
   //serializeJson(tasksobject,Serial);
 }
 
+void displayAlarm(DynamicJsonDocument &payloadarray)
+{
+  is_draw = 0;
+  is_draw_top = 0;
+  JsonObject tasksobject = payloadarray[1].as<JsonObject>();
+  if (tasksobject.isNull())
+  {
+    return;
+  }
+  const char *alarmName = tasksobject["name"];
+  const char *alarmDescription = tasksobject["description"];
+  const char *alarmDate = tasksobject["date"];
+  bool seeAlarm = false;
+  bool blink = false;
+  tft.setTextFont(1);
+  tft.setTextColor(TFT_WHITE);
+  tft.fillScreen(MEE_GREYPURPLE);
+  tft.setTextDatum(TC_DATUM);
+  tft.setTextSize(4);
+  tft.drawString("Alarm", SCREEN_WIDTH / 2, 10);
+  tft.setTextSize(2);
+  tft.drawString(alarmName, SCREEN_WIDTH / 2, (SCREEN_HEIGHT / 2) - 60);
+  tft.drawString(alarmDescription, SCREEN_WIDTH / 2, (SCREEN_HEIGHT / 2) - 20);
+  tft.drawString(alarmDate, SCREEN_WIDTH / 2, (SCREEN_HEIGHT / 2) + 20);
+
+  while (!seeAlarm)
+  {
+    socketIO.loop();
+    text_height = tft.fontHeight();
+    text_width = tft.textWidth("Click to continue");
+    if (millis() - tick_now > 500)
+    {
+      if (blink)
+      {
+        tft.fillRect(55, 180, text_width + 10, text_height, MEE_GREYPURPLE);
+        analogWrite(WIO_BUZZER, 0);
+      }
+      else
+      {
+        tft.drawString("Click to continue", SCREEN_WIDTH / 2, 180);
+        analogWrite(WIO_BUZZER, 100);
+      }
+
+      blink = !blink;
+
+      tick_now = millis();
+    }
+    for (int i = 0; i < NUM_BUTTONS; i++)
+    {
+      buttons[i].update();
+      if (buttons[i].fell())
+      {
+        analogWrite(WIO_BUZZER, 0);
+        seeAlarm = true;
+      }
+    }
+  }
+}
+
 void clearTask()
 {
   for (int i = 0; i < task_count; i++)
@@ -263,7 +331,10 @@ void serverEvent(uint8_t *payload, size_t length)
   {
     updateTaskPage(doc);
   }
-
+  else if (strcmp(event, "alarm") == 0)
+  {
+    displayAlarm(doc);
+  }
   else
   {
     Serial.println("no match");
@@ -428,10 +499,10 @@ void MeePlan_Logo()
   tft.setFreeFont(&FreeSansBoldOblique24pt7b);
   tft.setTextColor(TFT_WHITE);
   tft.setTextSize(1);
-  tft.drawString("Mee Plan", 60, 85);
+  tft.drawString("MeePlan", 60, 85);
   tft.setFreeFont(&FreeSansBold9pt7b);
   tft.drawString("Device ID: ", 75, 150);
-  tft.drawString(id, 170, 150);
+  tft.drawString(currentSetting.id, 170, 150);
   check_menu_logo = false;
   while (!check_menu_logo)
   {
@@ -443,7 +514,7 @@ void MeePlan_Logo()
     {
       if (blink)
       {
-        tft.fillRect(60, 180, text_width+10, text_height, MEE_GREYPURPLE);
+        tft.fillRect(60, 180, text_width + 10, text_height, MEE_GREYPURPLE);
       }
       else
       {
@@ -468,29 +539,124 @@ void MeePlan_Logo()
 
 void MeePlan_Setup()
 {
-  int blink = 0;
+  bool blink = false;
+  int state = 0;
+  bool draw = false;
   tick_now = millis();
   tft.fillScreen(MEE_GREYPURPLE);
-  tft.setTextDatum(TL_DATUM);
-  tft.setFreeFont(&FreeSansBoldOblique12pt7b);
   tft.setTextColor(TFT_WHITE);
+  tft.setTextDatum(TL_DATUM);
   tft.setTextSize(1);
-  tft.drawString("Enter device id in meeplan setting", 60, 85);
-  tft.setFreeFont(&FreeSansBold9pt7b);
-  tft.drawString("Device ID: ", 75, 150);
-  tft.drawString(id, 170, 150);
-  check_menu_logo = false;
-  while (!check_menu_logo)
+
+  while (state <= 6)
   {
+    for (int i = 0; i < NUM_BUTTONS; i++)
+    {
+      buttons[i].update();
+      if (buttons[i].fell())
+      {
+        Serial.println(state);
+        state = state + 1;
+        draw = false;
+        tft.fillScreen(MEE_GREYPURPLE);
+      }
+    }
+    if (!draw)
+    {
+      switch (state)
+      {
+      case 0:
+        tft.setFreeFont(&FreeSansBoldOblique24pt7b);
+        tft.drawString("MeePlan", 60, 85);
+        tft.setFreeFont(&FreeSansBold9pt7b);
+        //tft.drawString("Device ID: ", 75, 150);
+        //tft.drawString(id, 170, 150);
+        break;
+      case 1:
+        generateDeviceID(currentSetting.id);
+        EEPROM.put(storedAddress, WRITTEN_SIGNATURE);
+        EEPROM.put(storedAddress + sizeof(signature), currentSetting);
+        if (!EEPROM.getCommitASAP())
+        {
+          Serial.println("CommitASAP not set. Need commit()");
+          EEPROM.commit();
+        }
+        tft.setTextDatum(TC_DATUM);
+        tft.setFreeFont(&FreeSansBoldOblique12pt7b);
+        tft.drawString("Enter device ID in", SCREEN_WIDTH/2, 50);
+        tft.drawString("MeePlan Web setting.", SCREEN_WIDTH/2, 75);
+        tft.setTextDatum(TL_DATUM);
+        tft.setFreeFont(&FreeSansBold9pt7b);
+        tft.drawString("Device ID: ", 75, 150);
+        tft.drawString(currentSetting.id, 170, 150);
+        break;
+      case 2:
+        tft.setTextDatum(TC_DATUM);
+        tft.setFreeFont(&FreeSansBoldOblique12pt7b);
+        tft.drawString("You can view device ID", SCREEN_WIDTH/2, 50);
+        tft.drawString("in MeePlan Setting.", SCREEN_WIDTH/2, 75);
+        tft.pushImage((SCREEN_WIDTH/2)- (iconWidth/2), 110, iconWidth, iconHeight, settingicon);
+        tft.setFreeFont(&FreeSansBold9pt7b);
+        tft.drawString("(Restart after enter on website)", SCREEN_WIDTH/2, 150);
+        
+        break;
+      case 3:
+        tft.setTextDatum(TC_DATUM);
+        tft.setFreeFont(&FreeSansBoldOblique12pt7b);
+        tft.drawString("Up Down", SCREEN_WIDTH/2, 50);
+        tft.drawString("to navigate.", SCREEN_WIDTH/2, 75);
+        tft.drawCircle(SCREEN_WIDTH/2, SCREEN_HEIGHT/2,10, TFT_BLUE);
+        tft.fillCircle(SCREEN_WIDTH/2, SCREEN_HEIGHT/2,10, TFT_BLUE);
+        
+        break;
+      case 4:
+        tft.setTextDatum(TC_DATUM);
+        tft.setFreeFont(&FreeSansBoldOblique12pt7b);
+        tft.drawString("Left Right", SCREEN_WIDTH/2, 50);
+        tft.drawString("to change page.", SCREEN_WIDTH/2, 75);
+        tft.drawCircle(SCREEN_WIDTH/2, SCREEN_HEIGHT/2,10, TFT_BLUE);
+        tft.fillCircle(SCREEN_WIDTH/2, SCREEN_HEIGHT/2,10, TFT_BLUE);
+        tft.setFreeFont(&FreeSansBold9pt7b);
+        tft.drawString("(In task screen only)", SCREEN_WIDTH/2, 150);
+
+        break;
+      case 5:
+        tft.setTextDatum(TC_DATUM);
+        tft.setFreeFont(&FreeSansBoldOblique12pt7b);
+        tft.drawString("Push in", SCREEN_WIDTH/2, 50);
+        tft.drawString("to do action.", SCREEN_WIDTH/2, 75);
+        tft.drawCircle(SCREEN_WIDTH/2, SCREEN_HEIGHT/2,10, TFT_BLUE);
+        tft.fillCircle(SCREEN_WIDTH/2, SCREEN_HEIGHT/2,10, TFT_BLUE);
+        tft.setFreeFont(&FreeSansBold9pt7b);
+        break;
+      case 6:
+        tft.setTextDatum(TC_DATUM);
+        tft.setFreeFont(&FreeSansBoldOblique12pt7b);
+        tft.drawString("Push buttons on top", SCREEN_WIDTH/2, 50);
+        tft.drawString("to change menu.", SCREEN_WIDTH/2, 75);
+        tft.setTextDatum(TL_DATUM);
+        tft.drawString("^     ^     ^", 30, 10);
+        tft.pushImage((SCREEN_WIDTH/2)- (iconWidth/2)*3, 110, iconWidth, iconHeight, taskicon);
+        tft.pushImage((SCREEN_WIDTH/2)- (iconWidth/2), 110, iconWidth, iconHeight, clockicon);
+        tft.pushImage((SCREEN_WIDTH/2)+ (iconWidth/2), 110, iconWidth, iconHeight, settingicon);
+        
+        tft.setFreeFont(&FreeSansBold9pt7b);
+        break;
+      default:
+        break;
+      }
+      draw = true;
+    }
+    tft.setTextDatum(TL_DATUM);
     tft.setFreeFont(&FreeSansBoldOblique12pt7b);
     tft.setTextColor(TFT_LIGHTGREY);
     text_height = tft.fontHeight();
-    text_width = tft.textWidth("click to continue");
+    text_width = tft.textWidth("Click to continue");
     if (millis() - tick_now > 500)
     {
       if (blink)
       {
-        tft.fillRect(60, 180, text_width+10, text_height, MEE_GREYPURPLE);
+        tft.fillRect(60, 180, text_width + 10, text_height, MEE_GREYPURPLE);
       }
       else
       {
@@ -500,20 +666,10 @@ void MeePlan_Setup()
 
       tick_now = millis();
     }
-    for (int i = 0; i < NUM_BUTTONS; i++)
-    {
-      buttons[i].update();
-      if (buttons[i].fell())
-      {
-        check_menu_logo = true;
-      }
-    }
   }
   tft.setTextFont(1);
   tft.setTextSize(2);
 }
-
-
 
 void drawTask(uint32_t x, uint32_t y, task_type type, int status, const char *msg1, const char *msg2, const char *due)
 {
@@ -579,7 +735,7 @@ void drawTask(uint32_t x, uint32_t y, Task task)
 }
 
 void drawPageBar()
-{ 
+{
   if (pg_count != 0)
   {
     String temppg;
@@ -673,6 +829,7 @@ void handleOptionAction();
 
 void setup()
 {
+  pinMode(WIO_BUZZER, OUTPUT);
   char ssidapname[16] = "MeePlanTerm";
   const char *ssidap = ssidapname;
   rtc.begin();
@@ -707,7 +864,7 @@ void setup()
   Serial.println();
 
   //generateDeviceID(id);
-  Serial.println(id);
+  Serial.println(currentSetting.id);
   //testTask();
 
   for (int i = 0; i < NUM_BUTTONS; i++)
@@ -715,10 +872,15 @@ void setup()
     buttons[i].attach(BUTTON_PINS[i], INPUT_PULLUP); //setup the bounce instance for the current button
     buttons[i].interval(20);
   }
-
+  EEPROM.get(storedAddress, signature);
+  EEPROM.get(storedAddress+sizeof(signature), currentSetting);
+  if (signature != WRITTEN_SIGNATURE)
+  {
+    MeePlan_Setup();
+  }
   socketIO.setReconnectInterval(10000);
   String auth = "Authorization: ";
-  auth += id;
+  auth += currentSetting.id;
   socketIO.setExtraHeaders(auth.c_str());
   socketIO.begin(server_IP, server_port);
   socketIO.onEvent(socketIOEvent);
@@ -985,9 +1147,9 @@ void handleOptionAction()
     {
       if (socketIO.isConnected())
       {
-      MeePlan_Logo();
-      is_draw = false;
-      setupScreen(MEE_GREYPURPLE);
+        MeePlan_Logo();
+        is_draw = false;
+        setupScreen(MEE_GREYPURPLE);
       }
     }
     else if (cursor_position == 1)
@@ -1002,7 +1164,14 @@ void handleOptionAction()
     }
     else if (cursor_position == 3)
     {
-      tft.drawCircle(10, 10, 5, TFT_YELLOW);
+      EEPROM.put(storedAddress, 0);
+      if (!EEPROM.getCommitASAP())
+      {
+        Serial.println("CommitASAP not set. Need commit()");
+        EEPROM.commit();
+      }
+      wifiManager.resetSettings();
+      NVIC_SystemReset();
     }
     break;
   }
