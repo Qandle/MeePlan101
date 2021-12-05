@@ -57,8 +57,10 @@ enum action
 typedef enum tasktype
 {
   OFF,
+  BLUE,
   GREEN,
   YELLOW,
+  ORANGE,
   RED,
   GREY,
   BLACK,
@@ -254,7 +256,8 @@ void displayAlarm(DynamicJsonDocument &payloadarray)
   tft.drawString(alarmName, SCREEN_WIDTH / 2, (SCREEN_HEIGHT / 2) - 60);
   tft.drawString(alarmDescription, SCREEN_WIDTH / 2, (SCREEN_HEIGHT / 2) - 20);
   tft.drawString(alarmDate, SCREEN_WIDTH / 2, (SCREEN_HEIGHT / 2) + 20);
-
+  int volume = 128;
+  int sec=1;
   while (!seeAlarm)
   {
     socketIO.loop();
@@ -270,13 +273,28 @@ void displayAlarm(DynamicJsonDocument &payloadarray)
       else
       {
         tft.drawString("Click to continue", SCREEN_WIDTH / 2, 180);
-        analogWrite(WIO_BUZZER, 100);
+        analogWrite(WIO_BUZZER, volume);
+      }
+      
+      if(volume>10)
+      {
+        volume-=1;
+      }
+      sec+=1;
+      if(sec>=120)
+      {
+        seeAlarm = true;
+        analogWrite(WIO_BUZZER, 0);
       }
 
       blink = !blink;
 
       tick_now = millis();
     }
+
+    
+
+
     for (int i = 0; i < NUM_BUTTONS; i++)
     {
       buttons[i].update();
@@ -634,6 +652,7 @@ void MeePlan_Setup()
         tft.setFreeFont(&FreeSansBoldOblique12pt7b);
         tft.drawString("Push buttons on top", SCREEN_WIDTH/2, 50);
         tft.drawString("to change menu.", SCREEN_WIDTH/2, 75);
+        tft.drawString("To do, Clock, Setting", SCREEN_WIDTH/2, 140);
         tft.setTextDatum(TL_DATUM);
         tft.drawString("^     ^     ^", 30, 10);
         tft.pushImage((SCREEN_WIDTH/2)- (iconWidth/2)*3, 110, iconWidth, iconHeight, taskicon);
@@ -679,6 +698,10 @@ void drawTask(uint32_t x, uint32_t y, task_type type, int status, const char *ms
   tft.setTextSize(2);
   switch (type)
   {
+  case BLUE:
+    tft.setTextColor(TFT_BLACK, TFT_CYAN);
+    drawSelectbox(x, y, TFT_CYAN);
+    break;
   case GREEN:
     tft.setTextColor(TFT_BLACK, TFT_GREENYELLOW);
     drawSelectbox(x, y, TFT_GREENYELLOW);
@@ -686,6 +709,10 @@ void drawTask(uint32_t x, uint32_t y, task_type type, int status, const char *ms
   case YELLOW:
     tft.setTextColor(TFT_BLACK, TFT_YELLOW);
     drawSelectbox(x, y, TFT_YELLOW);
+    break;
+  case ORANGE:
+    tft.setTextColor(TFT_BLACK, TFT_ORANGE);
+    drawSelectbox(x, y, TFT_ORANGE);
     break;
   case RED:
     tft.setTextColor(TFT_WHITE, TFT_RED);
@@ -723,7 +750,7 @@ void drawTask(uint32_t x, uint32_t y, task_type type, int status, const char *ms
     {
       tft.fillRect(293, y + 12, 15, 20, TFT_WHITE);
       tft.drawRect(293, y + 12, 15, 20, TFT_BLACK);
-      tft.drawString("X", 295, y + 15);
+      tft.drawString("/", 295, y + 15);
     }
   }
   tft.setTextDatum(TL_DATUM);
@@ -932,7 +959,7 @@ void loop()
         tft.setTextSize(2);
         tft.setTextDatum(CC_DATUM);
         tft.setTextColor(TFT_BLACK, TFT_LIGHTGREY);
-        tft.drawString("TASK", SCREEN_WIDTH / 2, 18);
+        tft.drawString("TODO", SCREEN_WIDTH / 2, 18);
         is_draw_top = true;
       }
       fillMenu(MEE_LIGHTPURPLE);

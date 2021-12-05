@@ -127,10 +127,10 @@ void WiFiManager::setupConfigPortal() {
   server->on("/wifisave", std::bind(&WiFiManager::handleWifiSave, this));
   server->on("/i", std::bind(&WiFiManager::handleInfo, this));
   server->on("/r", std::bind(&WiFiManager::handleReset, this));
-  server->on("/hotspot-detect.html", std::bind(&WiFiManager::handleOthers, this));  // For iPhone
+  server->on("/hotspot-detect.html", std::bind(&WiFiManager::handleWifi, this, true));  // For iPhone
   server->on("/connecttest.txt", std::bind(&WiFiManager::handleOthers, this));      // For Windows
   server->on("/redirect", std::bind(&WiFiManager::handleOthers, this));             // For Windows
-  server->on("/generate_204", std::bind(&WiFiManager::handleOthers, this));         //Android/Chrome OS captive portal check.
+  server->on("/generate_204", std::bind(&WiFiManager::handleWifi, this, true));         //Android/Chrome OS captive portal check.
   // server->on("/fwlink", std::bind(&WiFiManager::handleRoot, this));  //Microsoft captive portal. Maybe not needed. Might be handled by notFound handler.
   server->onNotFound (std::bind(&WiFiManager::handleNotFound, this));
   server->begin(); // Web server start
