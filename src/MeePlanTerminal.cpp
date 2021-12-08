@@ -31,6 +31,13 @@ const int WRITTEN_SIGNATURE = 133735;
 //tft color format rgb565
 #define MEE_GREYPURPLE 0x526B
 #define MEE_LIGHTPURPLE 0xE71F
+#define MEE_RED 0xF372
+#define MEE_ORANGE 0xF4EF
+#define MEE_YELLOW 0xFF52
+#define MEE_GREEN 0xBFB3
+#define MEE_BLUE 0xEE7F
+
+
 
 #define SCREEN_WIDTH 320
 #define SCREEN_HEIGHT 240
@@ -191,7 +198,7 @@ void editTask(int id, int status)
 }
 
 void updateTaskPage(DynamicJsonDocument &payloadarray)
-{ //[event, {}]
+{ 
   JsonObject tasksobject = payloadarray[1].as<JsonObject>();
   if (tasksobject.isNull())
   {
@@ -592,6 +599,15 @@ void MeePlan_Setup()
         break;
       case 1:
         generateDeviceID(currentSetting.id);
+        if (strcmp(currentSetting.id,"YLSRJQ")==0){
+          //fallback if can't get proper time for random
+          int hour = atoi(__TIME__);
+          int min = atoi(__TIME__ + 3);
+          int sec = atoi(__TIME__ + 6);
+          int seed = 10000 * hour + 100 * min + sec
+          randomSeed(seed);
+          generateDeviceID(currentSetting.id);
+        }
         EEPROM.put(storedAddress, WRITTEN_SIGNATURE);
         EEPROM.put(storedAddress + sizeof(signature), currentSetting);
         if (!EEPROM.getCommitASAP())
@@ -699,24 +715,24 @@ void drawTask(uint32_t x, uint32_t y, task_type type, int status, const char *ms
   switch (type)
   {
   case BLUE:
-    tft.setTextColor(TFT_BLACK, TFT_CYAN);
-    drawSelectbox(x, y, TFT_CYAN);
+    tft.setTextColor(TFT_BLACK, MEE_BLUE);
+    drawSelectbox(x, y, MEE_BLUE);
     break;
   case GREEN:
-    tft.setTextColor(TFT_BLACK, TFT_GREENYELLOW);
-    drawSelectbox(x, y, TFT_GREENYELLOW);
+    tft.setTextColor(TFT_BLACK, MEE_GREEN);
+    drawSelectbox(x, y, MEE_GREEN);
     break;
   case YELLOW:
-    tft.setTextColor(TFT_BLACK, TFT_YELLOW);
-    drawSelectbox(x, y, TFT_YELLOW);
+    tft.setTextColor(TFT_BLACK, MEE_YELLOW);
+    drawSelectbox(x, y, MEE_YELLOW);
     break;
   case ORANGE:
-    tft.setTextColor(TFT_BLACK, TFT_ORANGE);
-    drawSelectbox(x, y, TFT_ORANGE);
+    tft.setTextColor(TFT_BLACK, MEE_ORANGE);
+    drawSelectbox(x, y, MEE_ORANGE);
     break;
   case RED:
-    tft.setTextColor(TFT_WHITE, TFT_RED);
-    drawSelectbox(x, y, TFT_RED);
+    tft.setTextColor(TFT_WHITE, MEE_RED);
+    drawSelectbox(x, y, MEE_RED);
     break;
   case GREY:
     tft.setTextColor(TFT_WHITE, TFT_DARKGREY);
