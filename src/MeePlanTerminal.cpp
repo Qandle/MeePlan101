@@ -604,7 +604,7 @@ void MeePlan_Setup()
           int hour = atoi(__TIME__);
           int min = atoi(__TIME__ + 3);
           int sec = atoi(__TIME__ + 6);
-          int seed = 10000 * hour + 100 * min + sec
+          int seed = 10000 * hour + 100 * min + sec;
           randomSeed(seed);
           generateDeviceID(currentSetting.id);
         }
