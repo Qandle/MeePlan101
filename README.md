@@ -36,3 +36,10 @@ Tl;dr Turning it off and on again usually works / check your wifi setting.
 
 If that doesn't work then the server is probably dead, you could try running it yourself using [this](https://github.com/nut1414/MeePlan101-backend) then changing server url location in the src file.
 
+
+## Website
+For more information about the website please visit [stalemoon/meeplanwebsite-1](https://github.com/stalemoon/meeplanwebsite-1) repo.
+
+## Backend
+For more information about the backend of the website and IoT please visit [nut1414/MeePlan101-backend](https://github.com/nut1414/MeePlan101-backend) repo.
+
